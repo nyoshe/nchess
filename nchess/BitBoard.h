@@ -6,9 +6,8 @@
 #include <iostream>
 #include <vector>
 
-
+#include "Enums.h"
 typedef unsigned long long u64;
-
 
 namespace BB {
     // from Grant Osborne, http://www.open-aurec.com/wbforum/viewtopic.php?f=4&t=51162
@@ -20,7 +19,8 @@ namespace BB {
         unsigned long long factor;
         int position;
     }
-    bishop_magics[64] = {  
+    
+    bishop_magics[64] = {
        {0x007bfeffbfeffbffull, 16530}, {0x003effbfeffbfe08ull, 9162}, {0x0000401020200000ull, 9674},  
        {0x0000200810000000ull, 18532}, {0x0000110080000000ull, 19172}, {0x0000080100800000ull, 17700},  
        {0x0007efe0bfff8000ull, 5730}, {0x00000fb0203fff80ull, 19661}, {0x00007dff7fdff7fdull, 17065},  
@@ -84,6 +84,16 @@ namespace BB {
     inline u64 ranks[8];
 
 
+    inline Pos dirs[8] = {
+        {  0,  1 }, // up
+        {  0, -1 }, // down
+        {  1,  0 }, // right
+		{ -1,  0 }, // left
+        {  1,  1 }, // up-right
+        { -1,  1 }, // up-left
+        {  1, -1 }, // down-right
+		{ -1, -1 }  // down-left
+	};
 
     inline std::vector<int> get_set_bits(u64 board) {
         std::vector<int> bits;
@@ -169,114 +179,99 @@ namespace BB {
 
     inline void init()
     {
-        // Directions: {df, dr}
-        const int directions[4][2] = {
-            {  1,  1 }, // top-right
-            { -1,  1 }, // top-left
-            {  1, -1 }, // bottom-right
-            { -1, -1 }  // bottom-left
-        };
+        // Rook directions: N, S, E, W
+        const Direction rook_dirs[] = { eNorth, eSouth, eEast, eWest };
+        // Bishop directions: NE, NW, SE, SW
+        const Direction bishop_dirs[] = { eNorthEast, eNorthWest, eSouthEast, eSouthWest };
 
-        //init diagonal attacks
+        // Initialize bishop and rook blocker masks
         for (int i = 0; i < 64; i++) {
             bishop_blocker_mask[i] = 0;
-            int file = i & 7;
-            int rank = i >> 3;
-
-            for (const auto& dir : directions) {
-                int f = file + dir[0];
-                int r = rank + dir[1];
-                while (f > 0 && f < 7 && r > 0 && r < 7) {
-                    bishop_blocker_mask[i] |= set_bit(f | (r << 3));
-                    f += dir[0];
-                    r += dir[1];
-                }
-            }
-
             rook_blocker_mask[i] = 0;
-            // Horizontal (same rank)
-            for (int f = 1; f < 7; f++) {
-                if (f != file) {
-                    rook_blocker_mask[i] |= set_bit(f | (rank << 3));
+            Pos origin(i);
+
+            // Bishop blocker mask
+            for (const auto& dir : bishop_dirs) {
+                Pos p = origin + dirs[static_cast<int>(dir)];
+                while (p.f > 0 && p.f < 7 && p.r > 0 && p.r < 7) {
+                    bishop_blocker_mask[i] |= set_bit(p.toSquare());
+                    p += dirs[static_cast<int>(dir)];
                 }
             }
-            // Vertical (same file)
-            for (int r = 1; r < 7; r++) {
-                if (r != rank) {
-                    rook_blocker_mask[i] |= set_bit(file | (r << 3));
+
+            // Rook blocker mask
+            for (const auto& dir : rook_dirs) {
+                Pos p = origin + dirs[static_cast<int>(dir)];
+                while (p.f > 0 && p.f < 7 && p.r > 0 && p.r < 7) {
+                    rook_blocker_mask[i] |= set_bit(p.toSquare());
+                    p += dirs[static_cast<int>(dir)];
                 }
             }
         }
 
-
+        // Rook and bishop coverage
         for (int i = 0; i < 64; ++i) {
-            // Rook coverage
             rook_coverage[i] = 0;
-            int file = i & 7;
-            int rank = i >> 3;
+            bishop_coverage[i] = 0;
+            Pos origin(i);
+
+            // Rook coverage
             // Right
-            for (int f = file + 1; f < 8; ++f)
-                rook_coverage[i] |= set_bit(f | (rank << 3));
+            for (int f = origin.f + 1; f < 8; ++f)
+                rook_coverage[i] |= set_bit(Pos(f, origin.r).toSquare());
             // Left
-            for (int f = file - 1; f >= 0; --f)
-                rook_coverage[i] |= set_bit(f | (rank << 3));
+            for (int f = origin.f - 1; f >= 0; --f)
+                rook_coverage[i] |= set_bit(Pos(f, origin.r).toSquare());
             // Up
-            for (int r = rank + 1; r < 8; ++r)
-                rook_coverage[i] |= set_bit(file | (r << 3));
+            for (int r = origin.r + 1; r < 8; ++r)
+                rook_coverage[i] |= set_bit(Pos(origin.f, r).toSquare());
             // Down
-            for (int r = rank - 1; r >= 0; --r)
-                rook_coverage[i] |= set_bit(file | (r << 3));
+            for (int r = origin.r - 1; r >= 0; --r)
+                rook_coverage[i] |= set_bit(Pos(origin.f, r).toSquare());
 
             // Bishop coverage
-            bishop_coverage[i] = 0;
-            // Directions: {df, dr}
-            for (const auto& dir : directions) {
-                int f = file + dir[0];
-                int r = rank + dir[1];
-                while (f >= 0 && f < 8 && r >= 0 && r < 8) {
-                    bishop_coverage[i] |= set_bit(f | (r << 3));
-                    f += dir[0];
-                    r += dir[1];
+            for (const auto& dir : bishop_dirs) {
+                Pos p = origin + dirs[static_cast<int>(dir)];
+                while (p.f >= 0 && p.f < 8 && p.r >= 0 && p.r < 8) {
+                    bishop_coverage[i] |= set_bit(p.toSquare());
+                    p += dirs[static_cast<int>(dir)];
                 }
             }
         }
 
-        // init knight attacks
+        // Knight attacks
         for (int i = 0; i < 64; i++) {
             knight_attacks[i] = 0;
-            int file = i & 7;
-            int rank = i >> 3;
+            Pos origin(i);
             // Knight moves
-            int knight_moves[8][2] = {
+            const int knight_moves[8][2] = {
                 {2, 1}, {2, -1}, {-2, 1}, {-2, -1},
                 {1, 2}, {1, -2}, {-1, 2}, {-1, -2}
             };
             for (auto& move : knight_moves) {
-                int new_file = file + move[0];
-                int new_rank = rank + move[1];
-                if (new_file >= 0 && new_file < 8 && new_rank >= 0 && new_rank < 8) {
-                    knight_attacks[i] |= set_bit(new_file | (new_rank << 3));
+                Pos p(origin.f + move[0], origin.r + move[1]);
+                if (p.f >= 0 && p.f < 8 && p.r >= 0 && p.r < 8) {
+                    knight_attacks[i] |= set_bit(p.toSquare());
                 }
             }
         }
-		//init king attacks
-		for (int i = 0; i < 64; i++) {
-			king_attacks[i] = 0;
-			int file = i & 7;
-			int rank = i >> 3;
-			// King moves
-			int king_moves[8][2] = {
-				{1, 0}, {-1, 0}, {0, 1}, {0, -1},
-				{1, 1}, {1, -1}, {-1, 1}, {-1, -1}
-			};
-			for (auto& move : king_moves) {
-				int new_file = file + move[0];
-				int new_rank = rank + move[1];
-				if (new_file >= 0 && new_file < 8 && new_rank >= 0 && new_rank < 8) {
-					king_attacks[i] |= set_bit(new_file | (new_rank << 3));
-				}
-			}
-		}
+
+        // King attacks
+        for (int i = 0; i < 64; i++) {
+            king_attacks[i] = 0;
+            Pos origin(i);
+            // King moves
+            const int king_moves[8][2] = {
+                {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+                {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+            };
+            for (auto& move : king_moves) {
+                Pos p(origin.f + move[0], origin.r + move[1]);
+                if (p.f >= 0 && p.f < 8 && p.r >= 0 && p.r < 8) {
+                    king_attacks[i] |= set_bit(p.toSquare());
+                }
+            }
+        }
 
         //init file masks
         for (int file = 0; file < 8; file++) {

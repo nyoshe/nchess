@@ -51,16 +51,16 @@ void Board::doMove(Move move)
             }
         }
         //modify castle flags for king move
-    	castle_flags &= (us == eWhite) ? ~(wShortCastleMask | wLongCastleMask) : ~(bShortCastleMask | bLongCastleMask);
+    	castle_flags &= (us == eWhite) ? ~(wShortCastleFlag | wLongCastleFlag) : ~(bShortCastleFlag | bLongCastleFlag);
 	}
 
 	//modify castle flags for rook move
     if (move.piece() == eRook) {
         switch (move.from()) {
-            case h1: castle_flags &= ~wShortCastleMask; break; // White king-side rook
-            case a1: castle_flags &= ~wLongCastleMask; break; // White queen-side rook
-            case h8: castle_flags &= ~bShortCastleMask; break; // Black king-side rook
-            case a8: castle_flags &= ~bLongCastleMask; break; // Black queen-side rook
+            case h1: castle_flags &= ~wShortCastleFlag; break; // White king-side rook
+            case a1: castle_flags &= ~wLongCastleFlag; break; // White queen-side rook
+            case h8: castle_flags &= ~bShortCastleFlag; break; // Black king-side rook
+            case a8: castle_flags &= ~bLongCastleFlag; break; // Black queen-side rook
 			default: break;
 		}
 	}
@@ -483,9 +483,7 @@ std::vector<Move> Board::getPseudoLegalMoves() const {
     // PAWNS
     u64 pawns = boards[us][ePawn];
     int forward = (us == eWhite) ? 8 : -8;
-    int start_rank = (us == eWhite) ? 1 : 6;
     int promo_rank = (us == eWhite) ? 6 : 1;
-    int ep_rank = (us == eWhite) ? 4 : 3;
 
     // Single pushes
     u64 single_push = (us == eWhite) ? (pawns << 8) : (pawns >> 8);
@@ -535,8 +533,7 @@ std::vector<Move> Board::getPseudoLegalMoves() const {
         }
     }
 
-    // En passant (if you track ep square, add logic here)
-    if (ep_square != eNone) {
+    if (ep_square != -1) {
         int ep_from = ep_square + (us == eWhite ? -8 : 8);
         if (piece_board[ep_square] == ePawn && (pawns & BB::set_bit(ep_from))) {
             // Left capture
@@ -583,7 +580,6 @@ std::vector<Move> Board::getPseudoLegalMoves() const {
     }
 
     // KING
-
     int from = BB::get_first_bit(boards[us][eKing]);
     assert(from != -1 && "No king found for the side to move");
 
@@ -596,24 +592,11 @@ std::vector<Move> Board::getPseudoLegalMoves() const {
     // e1 = 4, h1 = 7, a1 = 0 (White)
     // e8 = 60, h8 = 63, a8 = 56 (Black)
     if (us == eWhite) {
-        // King-side castling
-        if ((castle_flags & wShortCastleMask) && piece_board[f1] == eNone && piece_board[g1] == eNone) {
-            legalMoves.emplace_back(e1, g1, eKing, eNone, eNone);
-        }
-        // Queen-side castling
-        if ((castle_flags & wLongCastleMask) && piece_board[b1] == eNone && piece_board[c1] == eNone && piece_board[d1] == eNone) {
-            legalMoves.emplace_back(e1, c1, eKing, eNone, eNone);
-        }
-    }
-    else {
-        // King-side castling
-        if ((castle_flags & bShortCastleMask) && piece_board[f8] == eNone && piece_board[g8] == eNone) {
-            legalMoves.emplace_back(e8, g8, eKing, eNone, eNone);
-        }
-        // Queen-side castling
-        if ((castle_flags & bLongCastleMask) && piece_board[b8] == eNone && piece_board[c8] == eNone && piece_board[d8] == eNone) {
-            legalMoves.emplace_back(e8, c8, eKing, eNone, eNone);
-        }
+        if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) legalMoves.emplace_back(e1, g1, eKing);
+        if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) legalMoves.emplace_back(e1, c1, eKing);
+    } else {
+        if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) legalMoves.emplace_back(e8, g8, eKing);
+        if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) legalMoves.emplace_back(e8, c8, eKing);
     }
 
     return legalMoves;

@@ -82,11 +82,11 @@ public:
 		out += static_cast<char>('a' + (to() & 0x7));
 		out += static_cast<char>('1' + ((to() & 0x38) >> 3));
 		switch (promotion()) {
-		case eKnight: out += "n"; break;
-		case eBishop: out += "b"; break;
-		case eRook: out += "r"; break;
-		case eQueen: out += "q"; break;
-		default: break; // No promotion
+			case eKnight: out += "n"; break;
+			case eBishop: out += "b"; break;
+			case eRook: out += "r"; break;
+			case eQueen: out += "q"; break;
+			default: break; // No promotion
 		}
 		return out;
 	}

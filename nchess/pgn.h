@@ -3,8 +3,11 @@
 #include <vector>
 #include <sstream>
 #include <regex>
-#include "pgn.h"
 #include <fstream>
+#include <algorithm>
+#include <array>
+
+//I'm gonna be honest, this was almost entirely AI generated, I can't be bothered with parsers
 
 namespace pgn
 {
@@ -26,116 +29,84 @@ namespace pgn
         std::istringstream iss(pgnText);
         std::string token;
         int ply = 1;
-        int lastEval = 0; // Default eval if not present
 
-        // PGN results to skip
-        const std::vector<std::string> results = { "1-0", "0-1", "1/2-1/2", "*" };
+        // PGN results to skip - using array instead of vector for efficiency
+        const std::array<std::string_view, 4> results = { "1-0", "0-1", "1/2-1/2", "*" };
 
         while (iss >> token)
         {
             // Handle eval comments: { [%eval 0.23] }
             if (token == "{")
             {
-                std::string comment, word;
+                std::string comment;
+                std::string word;
                 // Read until closing '}'
                 while (iss >> word && word != "}")
                     comment += word + " ";
-                comment = comment.substr(0, comment.size() - 1); // Remove trailing space
 
-                // Look for [%eval ...]
+                // Process evaluation if present and we have moves
                 auto evalPos = comment.find("[%eval");
-                if (evalPos != std::string::npos)
+                if (evalPos != std::string::npos && !moves.empty())
                 {
                     std::string evalStr = comment.substr(evalPos + 6);
-                    // Remove leading/trailing spaces and brackets
+                    // Clean up the evaluation string
                     evalStr.erase(0, evalStr.find_first_not_of(" ["));
                     evalStr.erase(evalStr.find_last_not_of(" ]") + 1);
 
-                    // Now evalStr should be like "0.23" or "#5"
-                    if (!moves.empty())
-                    {
-                        if (!evalStr.empty() && evalStr[0] == '#')
-                        {
-                            // Mate score
-                            try {
-                                moves.back().eval = (evalStr[1] == '-') ? -100000 + std::stoi(evalStr.substr(2)) : 100000 - std::stoi(evalStr.substr(1));
-                            }
-                            catch (...) {
-                                moves.back().eval = 0;
-                            }
+                    try {
+                        if (!evalStr.empty() && evalStr[0] == '#') {
+                            // Handle mate score: #5 or #-5
+                            int mateDistance = std::stoi(evalStr.substr(evalStr[1] == '-' ? 2 : 1));
+                            moves.back().eval = evalStr[1] == '-' ?
+                                -100000 + mateDistance : 100000 - mateDistance;
                         }
-                        else
-                        {
-                            try {
-                                double eval = std::stod(evalStr);
-                                moves.back().eval = static_cast<int>(eval * 100); // centipawns
-                            }
-                            catch (...) {
-                                moves.back().eval = 0;
-                            }
+                        else {
+                            // Handle regular eval score
+                            moves.back().eval = static_cast<int>(std::stod(evalStr) * 100); // convert to centipawns
                         }
+                    }
+                    catch (...) {
+                        moves.back().eval = 0; // Default on parsing error
                     }
                 }
                 continue;
             }
 
-            // Skip move numbers (e.g., "1.", "23.", "14...") and results
-            if (token.empty())
+            // Skip tokens that aren't moves
+            if (token.empty() ||
+                (std::isdigit(token[0]) && token.find('.') != std::string::npos) ||
+                std::find(results.begin(), results.end(), token) != results.end() ||
+                token[0] == '(')
                 continue;
-            if (std::isdigit(token[0]))
-            {
-                auto dotPos = token.find('.');
-                if (dotPos != std::string::npos)
-                    continue;
-            }
-            if (std::find(results.begin(), results.end(), token) != results.end())
-                continue;
-            if (token[0] == '(')
-                continue; // skip variations (not robust, but fast)
 
-            // Remove trailing comment/annotation symbols
-            size_t end = token.find_first_of("!?#$");
-            if (end != std::string::npos)
+            // Remove trailing annotations
+            if (size_t end = token.find_first_of("!?#$"); end != std::string::npos)
                 token = token.substr(0, end);
 
-            // Remove trailing '+' or '#' for check/checkmate detection
+            // Extract check/checkmate indicators
             bool isCheck = false, isCheckmate = false;
-            if (!token.empty() && token.back() == '+')
-            {
-                isCheck = true;
-                token.pop_back();
-            }
-            else if (!token.empty() && token.back() == '#')
-            {
-                isCheckmate = true;
+
+            // Process ending characters for check/checkmate
+            while (!token.empty() && (token.back() == '+' || token.back() == '#')) {
+                isCheck = token.back() == '+' ? true : isCheck;
+                isCheckmate = token.back() == '#' ? true : isCheckmate;
                 token.pop_back();
             }
 
-            // Restore check/checkmate if both present (e.g., e8=Q+#)
-            if (!token.empty() && (token.back() == '+' || token.back() == '#'))
-            {
-                if (token.back() == '+') isCheck = true;
-                if (token.back() == '#') isCheckmate = true;
-                token.pop_back();
-            }
-
-            if (!token.empty())
-            {
-                moves.push_back(PgnMove{
-                    token,
-                    ply++,
-                    0, // eval will be set if a comment follows
-                    isCheck,
-                    isCheckmate,
-                    false
+            if (!token.empty()) {
+                moves.push_back({
+                    token,       // san
+                    ply++,       // ply
+                    0,           // eval (will be set if a comment follows)
+                    isCheck,     // isCheck
+                    isCheckmate, // isCheckmate
+                    false        // isStalemate
                     });
             }
         }
         return moves;
     }
-
-
-    std::vector<std::vector<PgnMove>> read_pgn_file(const std::string& filename)
+    inline std::vector<std::vector<PgnMove>> read_pgn_file(const std::string& filename)
     {
         std::ifstream file(filename);
         if (!file)
@@ -146,13 +117,16 @@ namespace pgn
         bool inGame = false;
         std::string line;
 
-        auto extract_moves_section = [](const std::string& gameText) -> std::string {
+        // Extract moves section from game text (header-free content)
+        auto extract_moves_section = [](const std::string& gameText) {
             std::istringstream iss(gameText);
             std::string line, movesSection;
             bool movesStarted = false;
+
             while (std::getline(iss, line)) {
                 if (!movesStarted && (line.empty() || line[0] == '['))
                     continue;
+
                 movesStarted = true;
                 if (!line.empty())
                     movesSection += line + ' ';
@@ -160,35 +134,29 @@ namespace pgn
             return movesSection;
             };
 
-        while (std::getline(file, line))
-        {
+        // Process game when complete
+        auto process_game = [&]() {
+            if (inGame && !currentGame.str().empty()) {
+                std::string movesText = extract_moves_section(currentGame.str());
+                gamesMoves.push_back(parse_pgn_moves(movesText));
+                currentGame.str("");
+                currentGame.clear();
+            }
+            };
+
+        while (std::getline(file, line)) {
             // Detect the start of a new game
-            if (line.rfind("[Event", 0) == 0)
-            {
-                if (inGame)
-                {
-                    // Extract only the moves section and parse
-                    std::string movesText = extract_moves_section(currentGame.str());
-                    auto moves = parse_pgn_moves(movesText);
-                    gamesMoves.push_back(std::move(moves));
-                    currentGame.str("");
-                    currentGame.clear();
-                }
+            if (line.rfind("[Event", 0) == 0) {
+                process_game(); // Process previous game if exists
                 inGame = true;
             }
+
             if (inGame)
-            {
                 currentGame << line << '\n';
-            }
         }
 
-        // Parse the last game if present
-        if (inGame && !currentGame.str().empty())
-        {
-            std::string movesText = extract_moves_section(currentGame.str());
-            auto moves = parse_pgn_moves(movesText);
-            gamesMoves.push_back(std::move(moves));
-        }
+        // Process the last game if present
+        process_game();
 
         return gamesMoves;
     }

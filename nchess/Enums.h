@@ -13,10 +13,14 @@ enum SpecialMove : uint8_t {
 };
 
 enum CastleMask : uint8_t {
-	wShortCastleMask = 0b0001,
-	wLongCastleMask = 0b0010,
-	bShortCastleMask = 0b0100,
-	bLongCastleMask = 0b1000
+	wShortCastleFlag = 0b0001,
+	wLongCastleFlag = 0b0010,
+	bShortCastleFlag = 0b0100,
+	bLongCastleFlag = 0b1000
+};
+
+enum Direction : uint8_t {
+	eNorth, eSouth, eEast, eWest, eNorthEast, eNorthWest, eSouthEast, eSouthWest
 };
 
 enum Square : uint8_t {
@@ -31,15 +35,25 @@ enum Square : uint8_t {
 };
 
 struct Pos {
-	uint8_t file; // 0-7
-	uint8_t rank; // 0-7
-	Pos(uint8_t f, uint8_t r) : file(f), rank(r) {};
-	Pos(uint8_t square) : file(square & 0x7), rank(square >> 3) {};
-	Pos() : file(0), rank(0) {};
+	int8_t f; // 0-7
+	int8_t r; // 0-7
+	Pos(int f, int r) : f(f), r(r) {};
+	Pos(uint8_t square) : f(square & 0x7), r(square >> 3) {};
+	Pos() : f(0), r(0) {};
 	bool operator==(const Pos& other) const {
-		return file == other.file && rank == other.rank;
+		return f == other.f && r == other.r;
 	}
 	Pos operator+(const Pos& other) const {
-		return Pos(file + other.file, rank + other.rank);
+		return Pos(f + other.f, r + other.r);
+	}
+
+	Pos& operator+=(const Pos& other) {
+		f += other.f;
+		r += other.r;
+		return *this;
+	}
+
+	uint8_t toSquare() const {
+		return (r << 3) | f; // rank * 8 + file
 	}
 };
