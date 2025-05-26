@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="Move">
+		<DisplayString>
+			from={from()}, to={to()}, piece={piece()}, captured={captured()}, promotion={promotion()}, ep={isEnPassant()}
+		</DisplayString>
+		<Expand>
+			<Item Name="from">from()</Item>
+			<Item Name="to">to()</Item>
+			<Item Name="piece">piece()</Item>
+			<Item Name="captured">captured()</Item>
+			<Item Name="promotion">promotion()</Item>
+			<Item Name="isEnPassant">isEnPassant()</Item>
+			<Item Name="data">data</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>
