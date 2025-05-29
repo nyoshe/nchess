@@ -16,29 +16,7 @@ private:
 	//bit 21: ep flag
 public:
 	constexpr Move() = default;
-	constexpr Move(std::string uci) {
-		if (uci.size() < 4 || uci.size() > 5) {
-			throw std::invalid_argument("Invalid UCI move format");
-		}
-		uint8_t from_file = uci[0] - 'a';
-		uint8_t from_rank = uci[1] - '1';
-		uint8_t to_file = uci[2] - 'a';
-		uint8_t to_rank = uci[3] - '1';
-		if (from_file > 7 || from_rank > 7 || to_file > 7 || to_rank > 7) {
-			throw std::out_of_range("UCI move out of bounds");
-		}
-		data |= (from_file & 0x7) | ((from_rank & 0x7) << 3);
-		data |= ((to_file & 0x7) | ((to_rank & 0x7) << 3)) << 6;
-		if (uci.size() == 5) {
-			switch (uci[4]) {
-			case 'n': data |= eKnight << 12; break;
-			case 'b': data |= eBishop << 12; break;
-			case 'r': data |= eRook << 12; break;
-			case 'q': data |= eQueen << 12; break;
-			default: throw std::invalid_argument("Invalid promotion piece");
-			}
-		}
-	}
+
 	constexpr Move(uint8_t from, uint8_t to) {
 		data |= from & 0x3F;
 		data |= (to & 0x3F) << 6;
@@ -63,7 +41,11 @@ public:
 	[[nodiscard]] uint8_t to() const { return (data >> 6) & 0x3F; }
 	[[nodiscard]] uint8_t piece() const { return (data >> 12) & 0x7; }
 	void setMoved(uint8_t piece) { data |= (piece & 0x7) << 12; }
-
+    bool isCastle() const {
+		if (piece() == eKing && std::abs(to() - from()) == 2) return true;
+		return false;
+    }
+	
 	[[nodiscard]] uint8_t captured() const { return (data >> 15) & 0x7; }
 	void setCaptured(uint8_t piece) { data |= (piece & 0x7) << 15; }
 
@@ -91,7 +73,7 @@ public:
 		return out;
 	}
 
-	
-
 	[[nodiscard]] uint32_t raw() const { return data; }
+
+	auto operator<=>(const Move&) const = default;
 };

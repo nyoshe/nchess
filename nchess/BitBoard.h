@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <vector>
+#include "Tables.h"
 
 #include "Enums.h"
 typedef unsigned long long u64;
@@ -120,7 +121,30 @@ namespace BB {
         return bits;
     }
 
-    inline int get_first_bit(u64 board) {
+    inline void bitscan_reset(unsigned long &idx, u64 &board) {
+#if defined(_MSC_VER)
+            _BitScanForward64(&idx, board);
+            board &= board - 1;
+            return;
+#elif defined(__GNUC__) || defined(__clang__)
+            idx = __builtin_ctzll(board);
+            board &= board - 1;
+			return idx
+#else
+        // Portable fallback (not using intrinsics)
+        for (int i = 0; i < 64; ++i) {
+            if (board & (1ULL << i)) {
+                board &= board - 1;
+                idx = i;
+                return;
+            }
+                
+        }
+#endif
+        return;
+    }
+
+    inline int bitscan(u64 board) {
 #if defined(_MSC_VER)
         unsigned long idx;
         if (_BitScanForward64(&idx, board)) {
@@ -179,6 +203,12 @@ namespace BB {
 
     inline void init()
     {
+        for (int i = 0; i < 7; i++) {
+            for (int square = 0; square < 64; square++) {
+                mg_table[i][square] += mg_p_val[i];
+                eg_table[i][square] += eg_p_val[i];
+            }
+        }
         // Rook directions: N, S, E, W
         const Direction rook_dirs[] = { eNorth, eSouth, eEast, eWest };
         // Bishop directions: NE, NW, SE, SW
@@ -193,7 +223,7 @@ namespace BB {
             // Bishop blocker mask
             for (const auto& dir : bishop_dirs) {
                 Pos p = origin + dirs[static_cast<int>(dir)];
-                while (p.f > 0 && p.f < 7 && p.r > 0 && p.r < 7) {
+                while (p.f >= 1 && p.f < 7 && p.r >= 1 && p.r < 7) {
                     bishop_blocker_mask[i] |= set_bit(p.toSquare());
                     p += dirs[static_cast<int>(dir)];
                 }
@@ -202,7 +232,8 @@ namespace BB {
             // Rook blocker mask
             for (const auto& dir : rook_dirs) {
                 Pos p = origin + dirs[static_cast<int>(dir)];
-                while (p.f > 0 && p.f < 7 && p.r > 0 && p.r < 7) {
+                while (p.f >= (origin.f == 0 ? 0 : 1) && p.f < (origin.f == 7 ? 8 : 7) &&
+						p.r >= (origin.r == 0 ? 0 : 1) && p.r < (origin.r == 7 ? 8 : 7)) {
                     rook_blocker_mask[i] |= set_bit(p.toSquare());
                     p += dirs[static_cast<int>(dir)];
                 }
@@ -347,7 +378,7 @@ namespace BB {
                     attacks |= set_bit(sq);
                     if (blockers & set_bit(sq)) break;
                 }
-                //std::cout << toString(attacks) << "\n";
+                
                 // Compute the magic index for this blocker set
                 u64 magic_index = (blockers * magic) >> 52;
 

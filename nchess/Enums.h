@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <string>
+
 enum Piece : uint8_t {
 	eNone, ePawn, eKnight, eBishop, eRook, eQueen, eKing
 };
@@ -37,8 +39,8 @@ enum Square : uint8_t {
 struct Pos {
 	int8_t f; // 0-7
 	int8_t r; // 0-7
-	Pos(int f, int r) : f(f), r(r) {};
-	Pos(uint8_t square) : f(square & 0x7), r(square >> 3) {};
+	Pos(const int8_t f, const int8_t r) : f(f), r(r) {};
+	Pos(const uint8_t square) : f(square & 0x7), r(square >> 3) {};
 	Pos() : f(0), r(0) {};
 	bool operator==(const Pos& other) const {
 		return f == other.f && r == other.r;
@@ -56,4 +58,33 @@ struct Pos {
 	uint8_t toSquare() const {
 		return (r << 3) | f; // rank * 8 + file
 	}
+};
+
+
+struct PerfT {
+	int depth = 0;                // Search depth
+	uint64_t nodes = 0;           // Total nodes
+	uint64_t captures = 0;        // Number of captures
+	uint64_t en_passant = 0;      // En passant moves
+	uint64_t castles = 0;         // Castling moves
+	uint64_t promotions = 0;      // Promotions
+	uint64_t checks = 0;          // Checks
+	uint64_t discovery_checks = 0;// Discovery checks
+	uint64_t double_checks = 0;   // Double checks
+	uint64_t checkmates = 0;      // Checkmates 
+    bool operator==(const PerfT&) const = default;
+
+    std::string to_string() {
+    return
+    "depth: " + std::to_string(depth) +
+    ", nodes: " + std::to_string(nodes) +
+    ", captures: " + std::to_string(captures) +
+    ", en_passant: " + std::to_string(en_passant) +
+    ", castles: " + std::to_string(castles) +
+    ", promotions: " + std::to_string(promotions) +
+    ", checks: " + std::to_string(checks) +
+    ", discovery_checks: " + std::to_string(discovery_checks) +
+    ", double_checks: " + std::to_string(double_checks) +
+    ", checkmates: " + std::to_string(checkmates);
+    };
 };

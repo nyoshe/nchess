@@ -100,18 +100,14 @@ namespace pgn
                     0,           // eval (will be set if a comment follows)
                     isCheck,     // isCheck
                     isCheckmate, // isCheckmate
-                    false        // isStalemate
+                    false        // isStalemate 
                     });
             }
         }
         return moves;
     }
-    inline std::vector<std::vector<PgnMove>> read_pgn_file(const std::string& filename)
+    inline std::vector<std::vector<PgnMove>> read_pgn_file(std::ifstream& file)
     {
-        std::ifstream file(filename);
-        if (!file)
-            throw std::runtime_error("Could not open PGN file: " + filename);
-
         std::vector<std::vector<PgnMove>> gamesMoves;
         std::ostringstream currentGame;
         bool inGame = false;

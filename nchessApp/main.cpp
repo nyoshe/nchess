@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <ctime>
+#include "../nchess/Engine.h"
 #include "../nchess/Board.h"
 #include <windows.h>
 #include <io.h>
@@ -11,56 +12,33 @@
 
 int main()
 {
-    auto allGames = pgn::read_pgn_file("output_with_evals.pgn");
-
+    /*
+    std::ifstream file("output_with_evals.pgn");
+    if (!file) {
+        throw std::invalid_argument("invalid file");
+    }
+    auto allGames = pgn::read_pgn_file(file);
+	*/
+    BB::init();
     SetConsoleOutputCP(CP_UTF8);
+
+    Engine engine;
+    int depth = 5;
+
+
+    std::vector<PerfT> results = engine.doPerftSearch("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ", depth);
+
+    for (int i = 0; i < depth; i++) {
+        std::cout << "results: " << results[i].to_string() << "\n\n";
+    }
 
 
     srand(static_cast<unsigned int>(time(0)));
-    BB::init();
-
+    
     Board test;
-
-
-    u64 test_board = 0;
-    for (int i = 0; i < 15; i++) {
-        test_board |= BB::set_bit(rand() % 64);
-    }
-
-    int test_space = rand() % 64;
-    std::cout << BB::to_string(test_board) << "\n";
-    std::cout << BB::to_string(BB::bishop_coverage[test_space]) << "\n";
-    std::cout << BB::to_string(BB::bishop_coverage[test_space] & test_board) << "\n";
-
-    std::cout << BB::to_string(BB::get_bishop_attacks(test_space, test_board)) << "\n";
-
-    for (auto gameMove : allGames[0]) {
-        //test.printBitBoards();
-        test.printBoard();
-
-        std::vector<Move> moves = test.getLegalMoves();
-
-        for (auto move : moves) {
-            std::cout << test.sanFromMove(move) << ", ";
-        }
-        std::cout << "\n";
-
-        std::cout << "Move: " << gameMove.san << "\n";
-
-        Move move = test.moveFromSan(gameMove.san);
-
-        test.doMove(move);
-    }
-
+	test.loadFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ");
+    test.printBitBoards();
     test.printBoard();
-
-    for (int i = 0; i < 40; i++) {
-        test.undoMove();
-
-        test.printBoard();
-    }
-
-
 
 }
 
