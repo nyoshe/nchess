@@ -89,10 +89,8 @@ Move Engine::search(int depth) {
                 std::cout << std::endl;
 
 				if (score >= beta) {
-					//storeTTEntry(b.getHash(), score, b.ply);
 					score = beta;
 				}
-				//storeTTEntry(b.getHash(), score, b.ply);
 			}
 			index++;
 		}
@@ -119,14 +117,14 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	if (search_ply >= MAX_PLY - 1) return b.getEval(); // Prevent array overflow
 	if (depthleft <= 0) return quiesce(alpha, beta);
 
-	//if (tt.contains(b.getHash()) && b.ply >= tt[b.getHash()].depth && max_depth <= tt[b.getHash()].search_depth) {
-	//	return tt[b.getHash()].eval;
-	//}
+
+	int best = -100000;
 
 	// Clear this node's PV
 	pv_length[search_ply] = 0;
 
 	std::vector<Move> legal_moves;
+	legal_moves.reserve(128);
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
 
@@ -137,29 +135,29 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 
 	sortMovesByEval(legal_moves);
 
-	int score= 0;
-
 	for (auto& move : legal_moves) {
 
 		b.doMove(move);
 
-		score = -alphaBeta(-beta, -alpha, depthleft - 1);
+		int score = -alphaBeta(-beta, -alpha, depthleft - 1);
 
 		b.undoMove();
 
-		if (score > alpha) {
-			if (max_depth >= best_pv.size()) {
-				best_pv = b.getLastMoves(search_ply);
+		if (score > best) {
+			best = score;
+			if (score > alpha) {
+				if (max_depth >= best_pv.size()) {
+					best_pv = b.getLastMoves(search_ply);
+				}
+				alpha = score;
 			}
-
-			if (score >= beta) {
-				return beta;
-			}
-			alpha = score;
+		}
+		if (score >= beta) {
+			return best;
 		}
 	}
 	//storeTTEntry(b.getHash(), alpha, b.ply);
-	return alpha;
+	return best;
 
 }
 
@@ -269,6 +267,7 @@ bool Engine::checkTime() {
 void Engine::calcTime() {
 	if (tc.movetime) {
 		max_time = tc.movetime;
+		return;
 	}
 	std::vector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
@@ -305,41 +304,39 @@ int Engine::quiesce(int alpha, int beta) {
 	}
 
 	std::vector<Move> captures;
+	captures.reserve(32);
 	b.genPseudoLegalCaptures(captures);
 	b.filterToLegal(captures);
 	// Check for #M
-	if (!captures.size() ) {
-		if (b.isCheck()){
+	if (!captures.size()) {
+		if (b.isCheck()) {
 			b.genPseudoLegalMoves(captures);
 			b.filterToLegal(captures);
 			if (!captures.size()) {
 				return -99999 + b.ply - start_ply;
 			}
-			
 		}
 	}
 	for (auto& move : captures) {
-
 		if (move.captured() == eKing) return 99999 - (b.ply - start_ply);
 
 		b.doMove(move);
 
-		//if (tt.contains(b.getHash()) && b.ply >= tt[b.getHash()].depth && max_depth <= tt[b.getHash()].search_depth) {
+		//if (tt.contains(b.getHash())) {
 		//	score = tt[b.getHash()].eval;
 		//} else {
-			score = -quiesce(-beta, -alpha);
-		//}
+		score = -quiesce(-beta, -alpha);
+		//s}
 
 		b.undoMove();
 
 		if (score > alpha) {
 			if (score >= beta)
 				return beta;
-
+			//storeTTEntry(b.getHash(), score, b.ply);
 			alpha = score;
 		}
 	}
-
 	return alpha;
 }
 

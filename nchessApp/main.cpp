@@ -16,6 +16,8 @@ int main()
 
     BB::init();
     UCI uci;
+    Board b;
+
     uci.loop();
 }
 

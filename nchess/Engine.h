@@ -5,15 +5,11 @@
 #include <algorithm>
 #include <unordered_map>
 struct TTEntry {
-	int16_t eval = 0;
+	int eval = 0;
 	u16 depth = 0;
 	u16 age = 0;
 	u16 search_depth = 0;
 };
-typedef struct LINE {
-	int cmove;              // Number of moves in the line.
-	Move argmove[256];  // The line.
-}   LINE;
 
 struct TimeControl {
 	int wtime = 0;
@@ -42,11 +38,11 @@ private:
 	int max_time = 0;
 	std::vector<PerfT> perf_values;
 	int pos_count = 0;
+	std::unordered_map<u64, TTEntry> tt;
+
 	void perftSearch(int depth);
 	int alphaBeta(int alpha, int beta, int depthleft);
 	int quiesce(int alpha, int beta);
-	std::unordered_map<u64, TTEntry> tt;
-
 public:
 	Board b;
 	TimeControl tc;
@@ -56,7 +52,7 @@ public:
 
 	void setBoardFEN(std::istringstream& fen);
 	void setBoardUCI(std::istringstream& uci);
-	
+
 	Move search(int depth);
 	std::vector<std::pair<int, Move>> sortMovesByEval(std::vector<Move>& moves);
 	std::vector<Move> getPrincipalVariation() const;

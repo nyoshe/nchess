@@ -214,8 +214,12 @@ void Board::printBoard() const {
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	bool color = true;
 
+	std::cout << "  a b c d e f g h \n";
+
 	for (int rank = 7; rank >= 0; rank--) {
+		std::cout << std::to_string(rank + 1) << " ";
 		for (int file = 0; file <= 7; file++) {
+			
 			// Set background color for the square  
 			std::string bgColor = "\x1b[48;2;" + std::to_string(color ? 252 : 230) + ";" +
 				std::to_string(color ? 197 : 151) + ";" +
@@ -266,7 +270,7 @@ void Board::printBoard() const {
 	}
 
 	// Print file labels  
-	std::cout << "a b c d e f g h \n\n";
+	std::cout << "  a b c d e f g h \n\n";
 }
 
 void Board::printBitBoards() const {
@@ -294,31 +298,32 @@ void Board::printBitBoards() const {
 
 std::string Board::boardString() const {
 	std::string out;
-	out += "   a  b  c  d  e  f  g  h\n"; // Add file labels at the top  
+	out += "  a b c d e f g h\n";
 	for (int rank = 7; rank >= 0; rank--) {
-		out += std::to_string(rank + 1) + " "; // Add rank label at the start of each row  
+		out += std::to_string(rank + 1); 
 		for (int file = 0; file <= 7; file++) {
 			u64 mask_pos = (1ULL << (file | (rank << 3)));
 			if (!(boards[eWhite][0] & mask_pos) && !(boards[eBlack][0] & mask_pos)) {
-				out += " . ";
+				out += " .";
 			}
 			else {
-				if (getSide(file | (rank << 3)) == eWhite) out += " w";
-				else out += " b";
+				
 
 				for (int side = 0; side < 2; side++) {
-					if (boards[side][eQueen] & mask_pos) out += "Q";
-					else if (boards[side][eKing] & mask_pos) out += "K";
-					else if (boards[side][eRook] & mask_pos) out += "R";
-					else if (boards[side][eBishop] & mask_pos) out += "B";
-					else if (boards[side][eKnight] & mask_pos) out += "N";
-					else if (boards[side][ePawn] & mask_pos) out += "P";
+					if (boards[side][eQueen] & mask_pos) out += " Q";
+					else if (boards[side][eKing] & mask_pos) out += " K";
+					else if (boards[side][eRook] & mask_pos) out += " R";
+					else if (boards[side][eBishop] & mask_pos) out += " B";
+					else if (boards[side][eKnight] & mask_pos) out += " N";
+					else if (boards[side][ePawn] & mask_pos) out += " P";
+
 				}
+				if (getSide(file | (rank << 3)) == eBlack) out[out.size() - 1] += 32;
 			}
 		}
-		out += " " + std::to_string(rank + 1) + "\n"; // Add rank label at the end of each row  
+		out += " " + std::to_string(rank + 1) + "\n";
 	}
-	out += "   a  b  c  d  e  f  g  h\n"; // Add file labels at the bottom  
+	out += "  a b c d e f g h\n";
 	return out;
 }
 
@@ -661,28 +666,21 @@ std::string Board::sanFromMove(Move move) {
 		san += "NBRQ"[promotion - eKnight];
 	}
 
-	// Handle check or checkmate  
-	// Assuming a function `isCheck()` and `isCheckmate()` exist  
-	/*  
-	if (isCheckmate()) {  
-	    san += '#';  
-	} else if (isCheck()) {  
-	    san += '+';  
-	}  
-	*/
+	//TODO: handle checkmate
+	if (isCheck()) {
+		san += '+';
+	}
 	return san;
 }
 
 void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 	const int them = us ^ 1;
-
 	u64 our_occ = boards[us][0];
 	u64 their_occ = boards[them][0];
 	u64 all_occ = our_occ | their_occ;
 
 	// PAWNS
 	u64 pawns = boards[us][ePawn];
-	int forward = (us == eWhite) ? 8 : -8;
 	int promo_rank = (us == eWhite) ? 6 : 1;
 
 	// Single pushes
@@ -838,6 +836,7 @@ void Board::genPseudoLegalMoves(std::vector<Move>& moves)  {
 }
 
 void Board::filterToLegal(std::vector<Move> &moves) {
+	//could be made quicker, perhaps only checking pieces between king and attackers
 	bool current_check = isCheck();
 	for (int i = 0; i < moves.size();) {
 		Move move = moves[i];
@@ -943,7 +942,26 @@ int16_t Board::evalUpdate() const {
 
 	out += (mg_val + (game_phase * eg_val - mg_val) / 24);
 
-	return us == eWhite ? out : -out;
+	
+	//count doubled pawns
+	out -= 50 * BB::popcnt(boards[eWhite][ePawn] & (boards[eWhite][ePawn] << 8));
+	out += 50 * BB::popcnt(boards[eBlack][ePawn] & (boards[eBlack][ePawn] << 8));
+	/*
+	//count isolated
+	for (int file = 0; file < 8; file ++) {
+		u64 neighbors = (file < 7 ? BB::files[file + 1] : 0) | (file > 0 ? BB::files[file - 1] : 0);
+		if (boards[eWhite][ePawn] & BB::files[file])
+			out -= (boards[eWhite][ePawn] & neighbors) ? 0 : 30;
+		if (boards[eBlack][ePawn] & BB::files[file])
+			out += (boards[eBlack][ePawn] & neighbors) ? 0 : 30;
+	}
+	*/
+
+	//count isolated pawns
+
+	out = us == eWhite ? out : -out;
+	
+	return out;
 }
 
 void Board::runSanityChecks() const {

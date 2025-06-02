@@ -67,7 +67,7 @@ struct Pos {
 
 
 struct PerfT {
-	int depth = 0;                // Search depth
+	int depth = 0;           // Search depth
 	u64 nodes = 0;           // Total nodes
 	u64 captures = 0;        // Number of captures
 	u64 en_passant = 0;      // En passant moves
