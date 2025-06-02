@@ -185,6 +185,7 @@
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="Move.cpp" />
     <ClCompile Include="nchess.cpp" />
+    <ClCompile Include="UCI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BitBoard.h" />
@@ -194,6 +195,7 @@
     <ClInclude Include="Enums.h" />
     <ClInclude Include="pgn.h" />
     <ClInclude Include="Tables.h" />
+    <ClInclude Include="UCI.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="move.natvis" />

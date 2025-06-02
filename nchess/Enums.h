@@ -72,19 +72,19 @@ struct PerfT {
 	uint64_t discovery_checks = 0;// Discovery checks
 	uint64_t double_checks = 0;   // Double checks
 	uint64_t checkmates = 0;      // Checkmates 
-    bool operator==(const PerfT&) const = default;
+	bool operator==(const PerfT&) const = default;
 
-    std::string to_string() {
-    return
-    "depth: " + std::to_string(depth) +
-    ", nodes: " + std::to_string(nodes) +
-    ", captures: " + std::to_string(captures) +
-    ", en_passant: " + std::to_string(en_passant) +
-    ", castles: " + std::to_string(castles) +
-    ", promotions: " + std::to_string(promotions) +
-    ", checks: " + std::to_string(checks) +
-    ", discovery_checks: " + std::to_string(discovery_checks) +
-    ", double_checks: " + std::to_string(double_checks) +
-    ", checkmates: " + std::to_string(checkmates);
-    };
+	std::string to_string() {
+		return
+			"depth: " + std::to_string(depth) +
+			", nodes: " + std::to_string(nodes) +
+			", captures: " + std::to_string(captures) +
+			", en_passant: " + std::to_string(en_passant) +
+			", castles: " + std::to_string(castles) +
+			", promotions: " + std::to_string(promotions) +
+			", checks: " + std::to_string(checks) +
+			", discovery_checks: " + std::to_string(discovery_checks) +
+			", double_checks: " + std::to_string(double_checks) +
+			", checkmates: " + std::to_string(checkmates);
+	};
 };

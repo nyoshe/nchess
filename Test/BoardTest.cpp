@@ -30,6 +30,25 @@ std::map<std::string, std::vector<PerfT>> perft_test_data = {
         {6, 8031647685, 1558445089, 3577504, 184513607, 56627920, 92238050, 568417, 54948, 360003}
     } }
 };
+
+struct TestPosition {
+    std::string fen;                  // FEN position string
+    std::string id;                   // Position ID (e.g. "ERET 001")
+    std::string description;          // Description (e.g. "Relief")
+    std::vector<std::string> moves;   // Best/avoid moves
+    bool is_white_to_move;           // true if white to move
+    bool is_avoid_move;              // true if moves are to be avoided (am) rather than best moves (bm)
+
+    bool operator==(const TestPosition& other) const {
+        return fen == other.fen &&
+            id == other.id &&
+            description == other.description &&
+            moves == other.moves &&
+            is_white_to_move == other.is_white_to_move &&
+            is_avoid_move == other.is_avoid_move;
+    }
+};
+
 TEST(BoardTest, InitializesToStartingPosition) {
     Board board;
     // a1 = 0, e1 = 4, e8 = 60, a8 = 56
@@ -52,7 +71,7 @@ TEST(BoardTest, MakeAndUndoMove) {
     Board board;
     std::vector<Move> moves;
     board.genPseudoLegalMoves(moves);
-    board.genLegalMoves(moves);
+    board.filterToLegal(moves);
     // Find e2e4
     Move move;
     for (const auto& m : moves) {
@@ -91,7 +110,7 @@ TEST(BoardTest, CastlingMoves) {
     // King-side castling
     std::vector<Move> moves;
     board.genPseudoLegalMoves(moves);
-    board.genLegalMoves(moves);
+    board.filterToLegal(moves);
     bool found_kingside = false, found_queenside = false;
     for (const auto& m : moves) {
         if (m.piece() == eKing && m.from() == 4 && m.to() == 6)

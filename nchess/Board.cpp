@@ -2,27 +2,7 @@
 
 
 Board::Board() {
-	boards[eWhite][ePawn] = 0x000000000000FF00;
-	boards[eBlack][ePawn] = 0x00FF000000000000;
-
-	boards[eWhite][eKnight] = 0b01000010;
-	boards[eBlack][eKnight] = (u64(0b01000010) << 56);
-
-	boards[eWhite][eBishop] = 0b00100100;
-	boards[eBlack][eBishop] = (u64(0b00100100) << 56);
-
-	boards[eWhite][eRook] = 0b10000001;
-	boards[eBlack][eRook] = (u64(0b10000001) << 56);
-
-	boards[eWhite][eQueen] = 0b00001000;
-	boards[eBlack][eQueen] = (u64(0b00001000) << 56);
-
-	boards[eWhite][eKing] = 0b00010000;
-	boards[eBlack][eKing] = (u64(0b00010000) << 56);
-
-
-	//legal_moves.reserve(256);
-	setOccupancy();
+	reset();
 }
 
 Board::Board(const Board& other) {
@@ -144,11 +124,15 @@ void Board::doMove(Move move) {
 	else {
 		ep_square = -1;
 	}
-
-	eval = evalUpdate();
 	// Update side to move  
 	us ^= 1;
 
+	hash ^= z_val[castle_flags];
+	hash ^= z_val[16 + ep_square & 0x7];
+	if (us) hash ^= z_val[24];
+	hash ^= z_val[25 + (move.from() << 3 | move.to())];
+
+	eval = evalUpdate();
 	// Increment ply count  
 	ply++;
 
@@ -170,6 +154,10 @@ void Board::undoMove() {
 	castle_flags = state_stack.back().castle_flags;
 	eval = state_stack.back().eval;
 	state_stack.pop_back();
+	hash ^= z_val[castle_flags];
+	hash ^= z_val[16 + ep_square & 0x7];
+	if (us) hash ^= z_val[24];
+	hash ^= z_val[25 + (move.from() << 3 | move.to())];
 
 	// Switch side to move back
 	us ^= 1;
@@ -339,10 +327,13 @@ void Board::movePiece(uint8_t from, uint8_t to) {
 	Side color = getSide(from);
 	if (color == eSideNone) {
 		printBitBoards();
-		std::cout << int(from) << " " << int(to) << "\n" << boardString();
+		printBoard();
+		undoMove();
+		printBitBoards();
+		printBoard();
 		throw std::logic_error("weird");
-		
 	}
+
 	boards[color][piece_board[from]] ^= BB::set_bit(from);
 	boards[color][0] ^= BB::set_bit(from);
 	boards[color][piece_board[from]] |= BB::set_bit(to);
@@ -353,8 +344,6 @@ void Board::movePiece(uint8_t from, uint8_t to) {
 
 	piece_board[to] = piece_board[from];
 	piece_board[from] = eNone;
-
-
 }
 
 void Board::setPiece(uint8_t square, uint8_t color, uint8_t piece) {
@@ -379,7 +368,8 @@ Side Board::getSide(int square) const {
 		       : (boards[eBlack][0] & BB::set_bit(square) ? eBlack : eSideNone);
 }
 
-void Board::loadFen(const std::string& fen) {
+void Board::loadFen(std::istringstream& fen_stream) {
+	reset();
 	// Clear all bitboards and piece_board
 	for (int side = 0; side < 2; ++side)
 		for (int piece = 0; piece < 7; ++piece)
@@ -387,13 +377,6 @@ void Board::loadFen(const std::string& fen) {
 	for (int i = 0; i < 64; ++i)
 		piece_board[i] = eNone;
 
-	ply = 0;
-	us = eWhite;
-	castle_flags = 0;
-	ep_square = -1;
-	state_stack.clear();
-
-	std::istringstream fen_stream(fen);
 	std::string board_part, active_color, castling, ep, halfmove, fullmove;
 	fen_stream >> board_part >> active_color >> castling >> ep >> halfmove >> fullmove;
 
@@ -429,6 +412,7 @@ void Board::loadFen(const std::string& fen) {
 	// Parse active color
 	us = (active_color == "w") ? eWhite : eBlack;
 
+	castle_flags = 0;
 	// Parse castling rights
 	for (char c : castling) {
 		switch (c) {
@@ -450,12 +434,54 @@ void Board::loadFen(const std::string& fen) {
 		ep_square = -1;
 	}
 
-	// Parse ply (halfmove clock)
+	if (!fullmove.empty())
+		ply = std::stoi(fullmove);
+
 	if (!halfmove.empty())
-		ply = std::stoi(halfmove);
+		half_move = std::stoi(halfmove);
 
 	// Recompute occupancy
 	setOccupancy();
+	runSanityChecks();
+}
+
+Move Board::moveFromUCI(const std::string& uci) {
+	std::vector<Move> moves;
+	genPseudoLegalMoves(moves);
+	filterToLegal(moves);
+
+	for (const auto& move : moves) {
+		if (move.toUci() == uci) {
+			return move;
+		}
+	}
+	throw std::logic_error("invalid move!");
+}
+
+void Board::loadUci(std::istringstream& iss) {
+    std::string token;
+    std::vector<std::string> tokens;
+    while (iss >> token) {
+        tokens.push_back(token);
+    }
+    if (tokens.empty()) return;
+
+    size_t idx = 0;
+    if (idx >= tokens.size()) return;
+
+    // Handle "moves" and apply each move
+    if (idx < tokens.size() && tokens[idx] == "moves") {
+        ++idx;
+        for (; idx < tokens.size(); ++idx) {
+            Move move = moveFromUCI(tokens[idx]);
+            if (move.raw() != 0) {
+                doMove(move);
+            } else {
+                // Invalid move, stop processing further
+                break;
+            }
+        }
+    }
 }
 
 Move Board::moveFromSan(const std::string& san) {
@@ -463,7 +489,7 @@ Move Board::moveFromSan(const std::string& san) {
 
 	std::vector<Move> moves;
 	genPseudoLegalMoves(moves);
-	genLegalMoves(moves);
+	filterToLegal(moves);
 	// Remove check/mate symbols
 	if (!move.empty() && (move.back() == '+' || move.back() == '#'))
 		move.pop_back();
@@ -601,7 +627,7 @@ std::string Board::sanFromMove(Move move) {
 	std::vector<Move> moves;
 	genPseudoLegalMoves(moves);
 	
-	genLegalMoves(moves);
+	filterToLegal(moves);
 	bool fileAmbiguity = false, rankAmbiguity = false;
 	for (const auto& m : moves) {
 		if (m.to() == to && m.piece() == piece && m.from() != from) {
@@ -694,6 +720,51 @@ void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 			moves.emplace_back(from, to, ePawn, piece_board[to]);
 		}
 	}
+
+
+	if (ep_square != -1) {
+		int ep_from = ep_square + (us == eWhite ? -8 : 8);
+		// Left capture
+		if ((ep_square & 7) > 0 && (pawns & BB::set_bit(ep_from - 1))) {
+			moves.emplace_back(ep_from - 1, ep_square, ePawn, ePawn, eNone, true);
+		}
+		// Right capture
+		if ((ep_square & 7) < 7 && (pawns & BB::set_bit(ep_from + 1))) {
+			moves.emplace_back(ep_from + 1, ep_square, ePawn, ePawn, eNone, true);
+		}
+	}
+
+	serializeMoves(eKnight, moves, false);
+	serializeMoves(eBishop, moves, false);
+	serializeMoves(eRook, moves, false);
+	serializeMoves(eQueen, moves, false);
+	serializeMoves(eKing, moves, false);
+	
+}
+
+void Board::serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet){
+
+	u64 all_occ = boards[eBlack][0] | boards[eWhite][0];
+	u64 our_occ = boards[us][0];
+	u64 attackers = boards[us][piece];
+	u64 mask = quiet ? ~all_occ : all_occ;
+	unsigned long from;
+	while (attackers) {
+		BB::bitscan_reset(from, attackers);
+		u64 targets = 0;
+		switch (piece) {
+			case eKnight: targets = BB::knight_attacks[from] & ~our_occ & mask; break;
+			case eBishop: targets = BB::get_bishop_attacks(from, all_occ) & ~our_occ & mask; break;
+			case eRook: targets = BB::get_rook_attacks(from, all_occ) & ~our_occ & mask; break;
+			case eQueen: targets = BB::get_queen_attacks(from, all_occ) & ~our_occ & mask; break;
+			case eKing: targets = BB::king_attacks[from] & ~our_occ & mask; break;
+		}
+		unsigned long to;
+		while (targets) {
+			BB::bitscan_reset(to, targets);
+			moves.emplace_back(from, to, piece, piece_board[to]);
+		}
+	}
 }
 
 void Board::genPseudoLegalMoves(std::vector<Move>& moves)  {
@@ -742,108 +813,52 @@ void Board::genPseudoLegalMoves(std::vector<Move>& moves)  {
 		}
 	}
 
-	
-	if (ep_square != -1) {
-		int ep_from = ep_square + (us == eWhite ? -8 : 8);
-		// Left capture
-		if ((ep_square & 7) > 0 && (pawns & BB::set_bit(ep_from - 1))) {
-			moves.emplace_back(ep_from - 1, ep_square, ePawn, ePawn, eNone, true);
-		}
-		// Right capture
-		if ((ep_square & 7) < 7 && (pawns & BB::set_bit(ep_from + 1))) {
-			moves.emplace_back(ep_from + 1, ep_square, ePawn, ePawn, eNone, true);
-		}
-	}
+	serializeMoves(eKnight, moves, true);
+	serializeMoves(eBishop, moves, true);
+	serializeMoves(eRook, moves, true);
+	serializeMoves(eQueen, moves, true);
+	serializeMoves(eKing, moves, true);
 
-	// KNIGHTS
-	for (int from : BB::get_set_bits(boards[us][eKnight])) {
-		attacks = BB::knight_attacks[from] & ~our_occ;
-		unsigned long to;
-		while (attacks) {
-			BB::bitscan_reset(to, attacks);
-			moves.emplace_back(from, to, eKnight, piece_board[to]);
-		}
-	}
-
-	// BISHOPS
-	for (int from : BB::get_set_bits(boards[us][eBishop])) {
-		attacks = BB::get_bishop_attacks(from, all_occ) & ~our_occ;
-		unsigned long to;
-		while (attacks) {
-			BB::bitscan_reset(to,attacks);
-			moves.emplace_back(from, to, eBishop, piece_board[to]);
-		}
-	}
-
-	// ROOKS
-	for (int from : BB::get_set_bits(boards[us][eRook])) {
-		attacks = BB::get_rook_attacks(from, all_occ) & ~our_occ;
-		unsigned long to;
-		while (attacks) {
-			BB::bitscan_reset(to, attacks);
-			moves.emplace_back(from, to, eRook, piece_board[to]);
-		}
-	}
-
-	// QUEENS
-	for (int from : BB::get_set_bits(boards[us][eQueen])) {
-		attacks = BB::get_queen_attacks(from, all_occ) & ~our_occ;
-		unsigned long to;
-		while (attacks) {
-			BB::bitscan_reset(to, attacks);
-			moves.emplace_back(from, to, eQueen, piece_board[to]);
-		}
-	}
-
-	// KING
-	int from = BB::bitscan(boards[us][eKing]);
-	assert(from != -1 && "No king found for the side to move");
-
-	attacks = BB::king_attacks[from] & ~our_occ;
-	unsigned long to;
-	while (attacks) {
-		BB::bitscan_reset(to, attacks);
-		moves.emplace_back(from, to, eKing, piece_board[to]);
-	}
 	// --- Castling logic ---
 	// King and rook must be on their original squares, and squares between must be empty
 	// e1 = 4, h1 = 7, a1 = 0 (White)
 	// e8 = 60, h8 = 63, a8 = 56 (Black)
-	if (us == eWhite) {
-		if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back(e1, g1, eKing);
-		if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back(e1, c1, eKing);
-	}
-	else {
-		if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back(
-			e8, g8, eKing);
-		if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back(
-			e8, c8, eKing);
+	if (!isCheck()) {
+		if (us == eWhite) {
+			if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back(e1, g1, eKing);
+			if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back(e1, c1, eKing);
+		}
+		else {
+			if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back(
+				e8, g8, eKing);
+			if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back(
+				e8, c8, eKing);
+		}
 	}
 }
 
-void Board::genLegalMoves(std::vector<Move> &moves) {
-
-	for (auto move = moves.begin(); move != moves.end();) {
-
-		if (move->isCastle()) {
-			if (getAttackers((move->to() + move->from()) / 2, us)) {
-				moves.erase(move);
+void Board::filterToLegal(std::vector<Move> &moves) {
+	bool current_check = isCheck();
+	for (int i = 0; i < moves.size();) {
+		Move move = moves[i];
+		if (move.isCastle()) {
+			if (getAttackers((move.to() + move.from()) / 2, us)) {
+				moves.erase(moves.begin() + i);
 				continue;
 			}
 		}
-		doMove(*move);
+		doMove(move);
 		// Find our king's square after the move
-
 		us ^= 1;
 		bool inCheck = isCheck();
 		us ^= 1;
-
 		undoMove();
+
 		if (!inCheck) {
-			++move;
+			++i;
 			continue;
 		} else {
-			moves.erase(move);
+			moves.erase(moves.begin() + i);
 		}
 	}
 
@@ -921,13 +936,14 @@ int16_t Board::evalUpdate() const {
 	while (black_squares) {
 		BB::bitscan_reset(at, black_squares);
 		uint8_t p = piece_board[at];
-		mg_val -= mg_table[p][at];
-		eg_val -= eg_table[p][at];
+		uint8_t sq = at;
+		mg_val -= mg_table[p][sq];
+		eg_val -= eg_table[p][sq];
 	}
 
 	out += (mg_val + (game_phase * eg_val - mg_val) / 24);
 
-	return out;
+	return us == eWhite ? out : -out;
 }
 
 void Board::runSanityChecks() const {
@@ -954,5 +970,66 @@ void Board::runSanityChecks() const {
 		std::cout << boardString();
 		throw std::logic_error("black bitboard mismatch");
 	}
+}
+
+void Board::printMoves() const {
+	for (auto state : state_stack) {
+		std::cout << state.move.toUci() << " ";
+	}
+	std::cout << "\n";
+}
+
+void Board::reset() {
+	// Reset all bitboards and piece_board to the initial chess position
+	boards[eWhite][ePawn] = 0x000000000000FF00;
+	boards[eBlack][ePawn] = 0x00FF000000000000;
+
+	boards[eWhite][eKnight] = 0b01000010;
+	boards[eBlack][eKnight] = (u64(0b01000010) << 56);
+
+	boards[eWhite][eBishop] = 0b00100100;
+	boards[eBlack][eBishop] = (u64(0b00100100) << 56);
+
+	boards[eWhite][eRook] = 0b10000001;
+	boards[eBlack][eRook] = (u64(0b10000001) << 56);
+
+	boards[eWhite][eQueen] = 0b00001000;
+	boards[eBlack][eQueen] = (u64(0b00001000) << 56);
+
+	boards[eWhite][eKing] = 0b00010000;
+	boards[eBlack][eKing] = (u64(0b00010000) << 56);
+
+
+
+	// Set up piece_board
+	static const uint8_t initial_piece_board[64] = {
+		eRook,   eKnight, eBishop, eQueen,  eKing,   eBishop, eKnight, eRook,
+		ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,
+		eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,
+		eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,
+		eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,
+		eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,
+		ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,
+		eRook,   eKnight, eBishop, eQueen,  eKing,   eBishop, eKnight, eRook
+	};
+	for (int i = 0; i < 64; ++i) {
+		piece_board[i] = initial_piece_board[i];
+	}
+
+	eval = 0;
+	ply = 0;
+	hash = 0;
+	us = eWhite;
+	castle_flags = 0b1111;
+	ep_square = -1;
+	state_stack.clear();
+
+
+	//legal_moves.reserve(256);
+	setOccupancy();
+}
+
+u64 Board::getHash() {
+	return hash;
 }
 
