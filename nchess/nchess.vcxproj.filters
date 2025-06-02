@@ -41,7 +41,7 @@
     <ClInclude Include="Move.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Enums.h">
+    <ClInclude Include="Misc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="BitBoard.h">

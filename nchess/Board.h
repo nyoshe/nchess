@@ -1,5 +1,5 @@
 #pragma once
-#include "Enums.h"
+#include "Misc.h"
 #include "BitBoard.h"
 #include "Move.h"
 #include "Tables.h"
@@ -15,9 +15,9 @@
 #include <sstream>
 #include <ranges>
 
-inline uint64_t rnd64(uint64_t n)
+inline u64 rnd64(u64 n)
 {
-    const uint64_t z = 0x9FB21C651E98DF25;
+    const u64 z = 0x9FB21C651E98DF25;
 
     n ^= ((n << 49) | (n >> 15)) ^ ((n << 24) | (n >> 40));
     n *= z;
@@ -30,10 +30,10 @@ inline uint64_t rnd64(uint64_t n)
 
 struct BoardState {
     int ep_square = -1;
-    uint8_t castle_flags = 0b1111; // 0bKQkq
+    u8 castle_flags = 0b1111; // 0bKQkq
     Move move;
     int16_t eval = 0;
-    BoardState(int ep_square, uint8_t castle_flags, Move move, int16_t eval)
+    BoardState(int ep_square, u8 castle_flags, Move move, int16_t eval)
         : ep_square(ep_square), castle_flags(castle_flags), move(move), eval(eval) {
     };
 
@@ -49,7 +49,7 @@ private:
     std::array < std::array<u64, 7>, 2 > boards;
 
     static std::array<u64, 793> initZobristValues() {
-        uint64_t state = 69;
+        u64 state = 69;
         std::array<u64, 793> values{};
         for (int i = 0; i < 793; i++) {
             values[i] = rnd64(state++);
@@ -59,13 +59,13 @@ private:
 
     inline static std::array<u64, 793> z_val = initZobristValues();
     
-    std::array<uint8_t, 64> piece_board;
+    std::array<u8, 64> piece_board;
 
     int16_t eval = 0;
     u64 hash = 0;
     int half_move = 0;
     
-    uint8_t castle_flags = 0b1111;
+    u8 castle_flags = 0b1111;
 	std::vector<BoardState> state_stack;
 	int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
 
@@ -88,9 +88,9 @@ public:
 
     void doMove(Move move);
     void undoMove();
-    void movePiece(uint8_t from, uint8_t to);
-    void setPiece(uint8_t square, uint8_t color, uint8_t piece);
-    void removePiece(uint8_t square);
+    void movePiece(u8 from, u8 to);
+    void setPiece(u8 square, u8 color, u8 piece);
+    void removePiece(u8 square);
 
     [[nodiscard]] Side getSide(int square) const;
     void loadFen(std::istringstream& fen_stream);

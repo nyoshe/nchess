@@ -7,8 +7,7 @@
 #include <vector>
 #include "Tables.h"
 
-#include "Enums.h"
-typedef unsigned long long u64;
+#include "Misc.h"
 
 namespace BB {
     // from Grant Osborne, http://www.open-aurec.com/wbforum/viewtopic.php?f=4&t=51162

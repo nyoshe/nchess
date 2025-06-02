@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <string>
-#include "Enums.h"
+#include "Misc.h"
 
 class Move
 {
@@ -17,45 +17,44 @@ private:
 public:
 	constexpr Move() = default;
 
-	constexpr Move(uint8_t from, uint8_t to) {
+	constexpr Move(const u8 from, const u8 to) {
 		data |= from & 0x3F;
 		data |= (to & 0x3F) << 6;
 	};
-	constexpr Move(uint8_t from, uint8_t to, uint8_t moved) : Move(from, to) {
+	constexpr Move(const u8 from, const u8 to, const u8 moved) : Move(from, to) {
 		data |= (moved & 0x7) << 12;
 	};
 
-	constexpr Move(uint8_t from, uint8_t to, uint8_t moved, uint8_t capture) : Move(from, to, moved) {
+	constexpr Move(const u8 from, const u8 to, const u8 moved, const u8 capture) : Move(from, to, moved) {
 		data |= (capture & 0x7) << 15;
 	};
 	
-	constexpr Move(uint8_t from, uint8_t to, uint8_t moved, uint8_t capture, uint8_t promotion) : Move(from, to, moved, capture) {
+	constexpr Move(const u8 from, const u8 to, const u8 moved, const u8 capture, const u8 promotion) : Move(from, to, moved, capture) {
 		data |= (promotion & 0x7) << 18;
 	};
 
-	constexpr Move(uint8_t from, uint8_t to, uint8_t moved, uint8_t capture, uint8_t promotion, bool ep_flag) : Move(from, to, moved, capture, promotion) {
+	constexpr Move(const u8 from, const u8 to, const u8 moved, const u8 capture, const u8 promotion, const bool ep_flag) : Move(from, to, moved, capture, promotion) {
 		data |= static_cast<uint32_t>(ep_flag) << 21;
 	};
 	
-	[[nodiscard]] uint8_t from() const { return data & 0x3F; }
-	[[nodiscard]] uint8_t to() const { return (data >> 6) & 0x3F; }
-	[[nodiscard]] uint8_t piece() const { return (data >> 12) & 0x7; }
-	void setMoved(uint8_t piece) { data |= (piece & 0x7) << 12; }
-    bool isCastle() const {
+	[[nodiscard]] u8 from() const { return data & 0x3F; }
+	[[nodiscard]] u8 to() const { return (data >> 6) & 0x3F; }
+	[[nodiscard]] u8 piece() const { return (data >> 12) & 0x7; }
+	void setMoved(const u8 piece) { data |= (piece & 0x7) << 12; }
+
+	[[nodiscard]] bool isCastle() const {
 		if (piece() == eKing && std::abs(to() - from()) == 2) return true;
 		return false;
     }
 	
-	[[nodiscard]] uint8_t captured() const { return (data >> 15) & 0x7; }
-	void setCaptured(uint8_t piece) { data |= (piece & 0x7) << 15; }
+	[[nodiscard]] u8 captured() const { return (data >> 15) & 0x7; }
+	void setCaptured(const u8 piece) { data |= (piece & 0x7) << 15; }
 
-	[[nodiscard]] uint8_t promotion() const { return (data >> 18) & 0x7; }
-	void setPromotion(uint8_t piece) { data |= (piece & 0x7) << 18; }
-
-	// Removed side() and setSide()
+	[[nodiscard]] u8 promotion() const { return (data >> 18) & 0x7; }
+	void setPromotion(const u8 piece) { data |= (piece & 0x7) << 18; }
 
 	[[nodiscard]] bool isEnPassant() const { return data & (1 << 21); }
-	void setEnPassant(bool ep_flag) { data |= static_cast<uint32_t>(ep_flag) << 21; }
+	void setEnPassant(const bool ep_flag) { data |= static_cast<uint32_t>(ep_flag) << 21; }
 
 	[[nodiscard]] std::string toUci() const {
 		std::string out;

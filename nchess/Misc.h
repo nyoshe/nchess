@@ -2,30 +2,35 @@
 #include <cstdint>
 #include <string>
 
-enum Piece : uint8_t {
+typedef unsigned long long u64;
+typedef uint16_t u16;
+typedef uint8_t u8;
+typedef int8_t i8;
+
+enum Piece : u8 {
 	eNone, ePawn, eKnight, eBishop, eRook, eQueen, eKing
 };
 
-enum Side : uint8_t {
+enum Side : u8 {
 	eWhite, eBlack, eSideNone
 };
 
-enum SpecialMove : uint8_t {
+enum SpecialMove : u8 {
 	wShortCastle, wLongCastle, bShortCastle, bLongCastle, enPassant
 };
 
-enum CastleMask : uint8_t {
+enum CastleMask : u8 {
 	wShortCastleFlag = 0b0001,
 	wLongCastleFlag = 0b0010,
 	bShortCastleFlag = 0b0100,
 	bLongCastleFlag = 0b1000
 };
 
-enum Direction : uint8_t {
+enum Direction : u8 {
 	eNorth, eSouth, eEast, eWest, eNorthEast, eNorthWest, eSouthEast, eSouthWest
 };
 
-enum Square : uint8_t {
+enum Square : u8 {
 	a1, b1, c1, d1, e1, f1, g1, h1,
 	a2, b2, c2, d2, e2, f2, g2, h2,
 	a3, b3, c3, d3, e3, f3, g3, h3,
@@ -37,10 +42,10 @@ enum Square : uint8_t {
 };
 
 struct Pos {
-	int8_t f; // 0-7
-	int8_t r; // 0-7
-	Pos(const int8_t f, const int8_t r) : f(f), r(r) {};
-	Pos(const uint8_t square) : f(square & 0x7), r(square >> 3) {};
+	i8 f; // 0-7
+	i8 r; // 0-7
+	Pos(const i8 f, const i8 r) : f(f), r(r) {};
+	Pos(const u8 square) : f(square & 0x7), r(square >> 3) {};
 	Pos() : f(0), r(0) {};
 	bool operator==(const Pos& other) const {
 		return f == other.f && r == other.r;
@@ -55,7 +60,7 @@ struct Pos {
 		return *this;
 	}
 
-	uint8_t toSquare() const {
+	u8 toSquare() const {
 		return (r << 3) | f; // rank * 8 + file
 	}
 };
@@ -63,15 +68,15 @@ struct Pos {
 
 struct PerfT {
 	int depth = 0;                // Search depth
-	uint64_t nodes = 0;           // Total nodes
-	uint64_t captures = 0;        // Number of captures
-	uint64_t en_passant = 0;      // En passant moves
-	uint64_t castles = 0;         // Castling moves
-	uint64_t promotions = 0;      // Promotions
-	uint64_t checks = 0;          // Checks
-	uint64_t discovery_checks = 0;// Discovery checks
-	uint64_t double_checks = 0;   // Double checks
-	uint64_t checkmates = 0;      // Checkmates 
+	u64 nodes = 0;           // Total nodes
+	u64 captures = 0;        // Number of captures
+	u64 en_passant = 0;      // En passant moves
+	u64 castles = 0;         // Castling moves
+	u64 promotions = 0;      // Promotions
+	u64 checks = 0;          // Checks
+	u64 discovery_checks = 0;// Discovery checks
+	u64 double_checks = 0;   // Double checks
+	u64 checkmates = 0;      // Checkmates 
 	bool operator==(const PerfT&) const = default;
 
 	std::string to_string() {

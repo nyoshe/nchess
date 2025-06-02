@@ -192,7 +192,7 @@
     <ClInclude Include="Board.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Move.h" />
-    <ClInclude Include="Enums.h" />
+    <ClInclude Include="Misc.h" />
     <ClInclude Include="pgn.h" />
     <ClInclude Include="Tables.h" />
     <ClInclude Include="UCI.h" />

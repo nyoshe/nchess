@@ -60,7 +60,7 @@ void Board::setOccupancy() {
 
 void Board::doMove(Move move) {
 	movePiece(move.from(), move.to());
-	uint8_t p = move.piece();
+	u8 p = move.piece();
 
 	// Add move to stack, along with previous en passant square and castle flags
 	state_stack.emplace_back(ep_square, castle_flags, move, eval);
@@ -74,7 +74,7 @@ void Board::doMove(Move move) {
 
 	// Handle en passant  
 	if (move.isEnPassant()) {
-		uint8_t ep_capture_square = move.to() + (us == eWhite ? -8 : 8);
+		u8 ep_capture_square = move.to() + (us == eWhite ? -8 : 8);
 		boards[!us][ePawn] &= ~BB::set_bit(ep_capture_square);
 		boards[!us][0] &= ~BB::set_bit(ep_capture_square);
 		piece_board[ep_capture_square] = eNone;
@@ -165,11 +165,11 @@ void Board::undoMove() {
 	// Decrement ply count
 	ply--;
 
-	uint8_t from = move.from();
-	uint8_t to = move.to();
-	uint8_t piece = move.piece();
-	uint8_t captured = move.captured();
-	uint8_t promotion = move.promotion();
+	u8 from = move.from();
+	u8 to = move.to();
+	u8 piece = move.piece();
+	u8 captured = move.captured();
+	u8 promotion = move.promotion();
 	// Handle castling undo (move rook back)
 	if (piece == eKing && std::abs((int)to - (int)from) == 2) {
 		if (us == eWhite) {
@@ -196,7 +196,7 @@ void Board::undoMove() {
 	// Handle en passant undo
 	if (move.isEnPassant()) {
 		
-		uint8_t ep_capture_square = to + (us == eWhite ? -8 : 8);
+		u8 ep_capture_square = to + (us == eWhite ? -8 : 8);
 		setPiece(ep_capture_square, !us, ePawn);
 	} else {
 		// Restore captured piece (if any)
@@ -322,7 +322,7 @@ std::string Board::boardString() const {
 	return out;
 }
 
-void Board::movePiece(uint8_t from, uint8_t to) {
+void Board::movePiece(u8 from, u8 to) {
 	//clear and set our piece
 	Side color = getSide(from);
 	if (color == eSideNone) {
@@ -346,13 +346,13 @@ void Board::movePiece(uint8_t from, uint8_t to) {
 	piece_board[from] = eNone;
 }
 
-void Board::setPiece(uint8_t square, uint8_t color, uint8_t piece) {
+void Board::setPiece(u8 square, u8 color, u8 piece) {
 	boards[color][piece] |= BB::set_bit(square);
 	boards[color][0] |= BB::set_bit(square);
 	piece_board[square] = piece;
 }
 
-void Board::removePiece(uint8_t square) {
+void Board::removePiece(u8 square) {
 	Side color = getSide(square);
 	if (color != eSideNone) {
 		boards[color][piece_board[square]] &= ~BB::set_bit(square);
@@ -594,11 +594,11 @@ Move Board::moveFromSan(const std::string& san) {
 
 std::string Board::sanFromMove(Move move) {
 	std::string san;
-	uint8_t from = move.from();
-	uint8_t to = move.to();
-	uint8_t piece = move.piece();
-	uint8_t captured = move.captured();
-	uint8_t promotion = move.promotion();
+	u8 from = move.from();
+	u8 to = move.to();
+	u8 piece = move.piece();
+	u8 captured = move.captured();
+	u8 promotion = move.promotion();
 
 	// Handle castling  
 	if (piece == eKing && abs((int)to - (int)from) == 2) {
@@ -925,8 +925,8 @@ int16_t Board::evalUpdate() const {
 	unsigned long at;
 	while (white_squares) {
 		BB::bitscan_reset(at, white_squares);
-		uint8_t p = piece_board[at];
-		uint8_t sq = at ^ 56;
+		u8 p = piece_board[at];
+		u8 sq = at ^ 56;
 		mg_val += mg_table[p][sq];
 		eg_val += eg_table[p][sq];
 	}
@@ -935,8 +935,8 @@ int16_t Board::evalUpdate() const {
 	at = 0;
 	while (black_squares) {
 		BB::bitscan_reset(at, black_squares);
-		uint8_t p = piece_board[at];
-		uint8_t sq = at;
+		u8 p = piece_board[at];
+		u8 sq = at;
 		mg_val -= mg_table[p][sq];
 		eg_val -= eg_table[p][sq];
 	}
@@ -1002,7 +1002,7 @@ void Board::reset() {
 
 
 	// Set up piece_board
-	static const uint8_t initial_piece_board[64] = {
+	static const u8 initial_piece_board[64] = {
 		eRook,   eKnight, eBishop, eQueen,  eKing,   eBishop, eKnight, eRook,
 		ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,   ePawn,
 		eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,   eNone,

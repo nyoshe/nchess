@@ -6,9 +6,9 @@
 #include <unordered_map>
 struct TTEntry {
 	int16_t eval = 0;
-	uint16_t depth = 0;
-	uint16_t age = 0;
-	uint16_t search_depth = 0;
+	u16 depth = 0;
+	u16 age = 0;
+	u16 search_depth = 0;
 };
 typedef struct LINE {
 	int cmove;              // Number of moves in the line.
@@ -33,15 +33,13 @@ private:
 	std::vector<Move> best_pv;
 	// Engine state variables
 	int start_ply = 0;
-	uint16_t max_depth = 0;
+	u16 max_depth = 0;
 	int nodes = 0;
 	int current_age = 0;
+
     // Timer variables
     std::clock_t start_time = 0;
 	int max_time = 0;
-	bool is_running = false;
-
-	
 	std::vector<PerfT> perf_values;
 	int pos_count = 0;
 	void perftSearch(int depth);
@@ -52,42 +50,24 @@ private:
 public:
 	Board b;
 	TimeControl tc;
-	std::vector<PerfT>  doPerftSearch(int depth);
+
+	std::vector<PerfT> doPerftSearch(int depth);
+	std::vector<PerfT> doPerftSearch(std::string position, int depth);
+
 	void setBoardFEN(std::istringstream& fen);
 	void setBoardUCI(std::istringstream& uci);
-	std::vector<PerfT>  doPerftSearch(std::string position, int depth);
+	
 	Move search(int depth);
 	std::vector<std::pair<int, Move>> sortMovesByEval(std::vector<Move>& moves);
 	std::vector<Move> getPrincipalVariation() const;
+
 	void printPV(Move root_move, int score) const;
+
 	void pruneTT(size_t max_size);
-
-	void storeTTEntry(u64 hash_key, int16_t eval, uint8_t depth);
-
+	void storeTTEntry(u64 hash_key, int16_t eval, u8 depth);
 	void updateTTAge();
-	bool checkTime() {
-		if ((1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC) > max_time) return true;
-		return false;
-	}
-	void calcTime() {
-		if (tc.movetime) {
-			max_time = tc.movetime;
-		}
-		std::vector<Move> legal_moves;
-		b.genPseudoLegalMoves(legal_moves);
-		b.filterToLegal(legal_moves);
-		float num_moves = legal_moves.size();
-		float factor = num_moves / 500.0;
 
-		float total_time = b.us ? tc.btime : tc.wtime;
-		float inc = b.us ? tc.binc : tc.winc;
-
-		if (total_time < inc) {
-			max_time = inc * 0.95;
-		} else {
-			max_time = (total_time * factor) + inc * 0.95;
-		}
-		//max_time = inc;
-	}
+	bool checkTime();
+	void calcTime();
 };
 

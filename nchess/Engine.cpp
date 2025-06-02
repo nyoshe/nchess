@@ -242,23 +242,49 @@ void Engine::pruneTT(size_t max_size) {
 	tt = std::move(new_tt);
 }
 
-void Engine::storeTTEntry(u64 hash_key, int16_t eval, uint8_t depth) {
+void Engine::storeTTEntry(u64 hash_key, int16_t eval, u8 depth) {
 	const size_t MAX_TT_SIZE = 1000000; // Adjust based on your needs
 
 	if (tt.size() >= MAX_TT_SIZE) {
 		pruneTT(MAX_TT_SIZE * 0.75); // Reduce to 75% of max size
 	}
 
-	tt[hash_key] = TTEntry{eval, uint16_t(b.ply), uint16_t(current_age), max_depth /* current age */ };
+	tt[hash_key] = TTEntry{eval, u16(b.ply), u16(current_age), max_depth /* current age */ };
 }
 
 void Engine::updateTTAge() {
-	static uint16_t current_age = 0;
+	static u16 current_age = 0;
 	current_age++;
 
 	for (auto& [key, entry] : tt) {
 		entry.age = current_age;
 	}
+}
+
+bool Engine::checkTime() {
+	if ((1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC) > max_time) return true;
+	return false;
+}
+
+void Engine::calcTime() {
+	if (tc.movetime) {
+		max_time = tc.movetime;
+	}
+	std::vector<Move> legal_moves;
+	b.genPseudoLegalMoves(legal_moves);
+	b.filterToLegal(legal_moves);
+	float num_moves = legal_moves.size();
+	float factor = num_moves / 500.0;
+
+	float total_time = b.us ? tc.btime : tc.wtime;
+	float inc = b.us ? tc.binc : tc.winc;
+
+	if (total_time < inc) {
+		max_time = inc * 0.95;
+	} else {
+		max_time = (total_time * factor) + inc * 0.95;
+	}
+	//max_time = inc;
 }
 
 int Engine::quiesce(int alpha, int beta) {
