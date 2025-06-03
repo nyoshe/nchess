@@ -4,6 +4,7 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_map>
+#include "robin_hood.h"
 enum class TType {
 	EXACT,
 	ALPHA,
@@ -15,7 +16,7 @@ struct TTEntry {
 	u8 depth = 0;
 	u8 age = 0;
 	u8 search_depth = 0;
-	TType flag = TType::EXACT;
+	TType type = TType::EXACT;
 };
 
 struct TimeControl {
@@ -29,6 +30,8 @@ struct TimeControl {
 class Engine
 {
 private:
+	int hash_hits;
+	int hash_miss;
 	Move best_move;
 	static constexpr int MAX_PLY = 64;
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
@@ -46,7 +49,7 @@ private:
 	int max_time = 0;
 	std::vector<PerfT> perf_values;
 	int pos_count = 0;
-	std::unordered_map<u64, TTEntry> tt;
+	robin_hood::unordered_map<u64, TTEntry> tt;
 
 	void perftSearch(int depth);
 	int alphaBeta(int alpha, int beta, int depthleft);
@@ -68,8 +71,17 @@ public:
 	void printPV(Move root_move, int score) const;
 
 	void pruneTT(size_t max_size);
-	void storeTTEntry(u64 hash_key, int score, int alpha, int beta, u8 depth);
+	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth);
 	void updateTTAge();
+	TTEntry* probeTT(u64 hash_key) {
+		auto it = tt.find(hash_key);
+		if (it != tt.end()) {
+			hash_hits++;
+			return &(it->second);
+		}
+		hash_miss++;
+		return nullptr;
+	}
 
 	bool checkTime();
 	void calcTime();

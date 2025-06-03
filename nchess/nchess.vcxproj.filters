@@ -59,6 +59,9 @@
     <ClInclude Include="UCI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="robin_hood.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="move.natvis">

@@ -188,8 +188,7 @@ void Board::undoMove() {
 	if (promotion != eNone) {
 		removePiece(to); // Remove promoted piece
 		setPiece(from, us, ePawn); // Restore pawn to 'from'
-	}
-	else {
+	} else {
 		removePiece(to);
 		setPiece(from, us, piece);
 		//movePiece(to, from);
@@ -197,11 +196,9 @@ void Board::undoMove() {
 
 	// Handle en passant undo
 	if (move.isEnPassant()) {
-		
 		u8 ep_capture_square = to + (us == eWhite ? -8 : 8);
 		setPiece(ep_capture_square, !us, ePawn);
 	} else {
-		// Restore captured piece (if any)
 		if (captured != eNone) {
 			setPiece(to, !us, captured);
 		}

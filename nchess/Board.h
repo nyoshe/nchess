@@ -15,6 +15,7 @@
 #include <sstream>
 #include <ranges>
 #include <unordered_map>
+#include "robin_hood.h"
 
 inline u64 rnd64()
 {
@@ -73,7 +74,7 @@ private:
     u8 castle_flags = 0b1111;
 	
 	int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
-    std::unordered_map < u64, int > pos_history;
+    robin_hood::unordered_map < u64, int > pos_history;
 public:
     std::vector<BoardState> state_stack;
     bool us = eWhite;
