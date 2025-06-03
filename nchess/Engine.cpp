@@ -3,6 +3,7 @@
 #include <algorithm>
 
 void Engine::perftSearch(int d) {
+
 	if (!d) return;
 	std::vector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
@@ -41,16 +42,23 @@ void Engine::perftSearch(int d) {
 }
 
 Move Engine::search(int depth) {
+	for (auto& i : history_table) {
+		for (auto& j : i) {
+			for (auto& k : j) {
+				k = 0;
+			}
+		}
+	}
 	start_time = std::clock();
 	start_ply = b.ply;
-
+	tt.clear();
 
 	std::vector<std::pair<int, Move>> out;
 	best_move = Move();
 	std::vector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
-	sortMovesByEval(legal_moves);
+	sortMoves(legal_moves);
 	calcTime();
 
 	for (auto move : legal_moves) {
@@ -62,12 +70,11 @@ Move Engine::search(int depth) {
 
 
 	for (max_depth = 2 ; max_depth < 10; max_depth++) {
-		updateTTAge();
 
 		// Start with narrow aspiration window
-		int alpha = score - 25;
-		int beta = score + 25;
-		int delta = 25;
+		int alpha = score - 50;
+		int beta = score + 50;
+		int delta = 50;
 
 		// Keep searching until we get a score within our window
 		while (true) {
@@ -137,10 +144,8 @@ Move Engine::search(int depth) {
 
 int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	if (checkTime()) return -100000;
-
+	nodes++;
 	u64 hash_key = b.getHash();
-
-
 	// Probe the transposition table
 	TTEntry* entry = probeTT(hash_key);
 
@@ -152,26 +157,28 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	// If we have a valid entry that's deep enough for our current search
 	if (entry && entry->depth >= depthleft) {
 		// Use the entry based on its bound type
-		if (entry->type == TType::EXACT) {
-			return entry->eval;
-		}
-		else if (entry->type == TType::BETA && entry->eval >= beta) {
-			return entry->eval;  // Beta cutoff
-		}
-		else if (entry->type == TType::ALPHA && entry->eval <= alpha) {
-			return entry->eval;  // Alpha cutoff
-		}
+		if (entry->type == TType::EXACT) return entry->eval;
+		if (entry->type == TType::BETA && entry->eval >= beta) return entry->eval;  // Beta cutoff
+		if (entry->type == TType::ALPHA && entry->eval <= alpha) return entry->eval;  // Alpha cutoff
 	}
 
-	if (b.is3fold()) {
-		return 0;
+	if (b.is3fold()) return 0;
+	if (b.half_move == 50) return 0;
+
+
+	if (!is_pv && depthleft >= 3 && !b.isCheck()) {
+		b.doMove(Move(0,0));
+		const int R = 2 + (depthleft / 6);
+		int null_score = -alphaBeta(-beta, -beta + 1, depthleft - 1 - R);
+		b.undoMove();
+		if (null_score >= beta) return beta;  // If the position is good enough even after giving opponent a free move, it's likely a beta cutoff
 	}
 
 	int best = -100000;
 
 	// Clear this node's PV
 	pv_length[search_ply] = 0;
-
+	Move best_move;
 	std::vector<Move> legal_moves;
 	legal_moves.reserve(128);
 	b.genPseudoLegalMoves(legal_moves);
@@ -181,48 +188,37 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	if (legal_moves.empty()) {
 		return b.isCheck() ? -99999 + search_ply : 0;
 	}
-
-
 	
-	sortMovesByEval(legal_moves);
+	sortMoves(legal_moves);
 	int score = 0;
 	for (auto& move : legal_moves) {
 
 		b.doMove(move);
-		
 		score = -alphaBeta(-beta, -alpha, depthleft - 1);
 		b.undoMove();
-
 
 		if (score > best) {
 			best = score;
 			if (score > alpha) {
 				//score improved
 				alpha = score;
-				/*
-				// Store this move as the first move in the PV for this ply
-				pv_table[search_ply][0] = move;
-
-				// Copy the child's PV after this move
-				for (int j = 0; j < pv_length[search_ply + 1]; j++) {
-					pv_table[search_ply][j + 1] = pv_table[search_ply + 1][j];
-				}
-
-				// Update the PV length for this ply
-				pv_length[search_ply] = pv_length[search_ply + 1] + 1;
-				*/
-
+				best_move = move;
+				//if (!move.captured()) history_table[b.us][move.from()][move.to()] += (b.ply - start_ply);
+				is_pv = true;
 				best_pv = b.getLastMoves(search_ply);
 				best_pv_state = b.state_stack;
 			}
 		}
 		if (score >= beta) {
-			//beta cutoff, fail high
+			is_pv = false;
+			//beta cutoff, fail high, too good
+			if (!move.captured()) history_table[!b.us][move.from()][move.to()] += (b.ply-start_ply);
 			storeTTEntry(b.getHash(), beta, TType::BETA , depthleft);
 			return beta;
 		}
 	}
 	if (best <= alpha) {
+		is_pv = false;
 		// fail-low node - none of the moves improved alpha
 		storeTTEntry(b.getHash(), alpha, TType::ALPHA, depthleft);
 		return alpha;
@@ -232,17 +228,12 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	storeTTEntry(b.getHash(), best, TType::EXACT, depthleft);
 	return best;
 }
-
-
-std::vector<std::pair<int, Move>> Engine::sortMovesByEval(std::vector<Move>& moves) {
-
-	
-
-    // Store original board state to restore after each move
-    std::vector<std::pair<int, Move>> eval_moves;
-    eval_moves.reserve(moves.size());
-	int piece_vals[7] = {0, 100, 320, 330, 500, 900 , 99999};
-    for (auto& move : moves) {
+/*
+std::vector<std::pair<int, Move>> Engine::sortMoves(std::vector<Move>& moves) {
+	std::vector<std::pair<int, Move>> eval_moves;
+	eval_moves.reserve(moves.size());
+	int piece_vals[7] = { 0, 100, 320, 330, 500, 900 , 99999 };
+	for (auto& move : moves) {
 		int eval = 0;
 		if (move.captured()) {
 			// MVV-LVA score: victim value * 10 - attacker value
@@ -256,18 +247,75 @@ std::vector<std::pair<int, Move>> Engine::sortMovesByEval(std::vector<Move>& mov
 		// If we have a valid entry that's deep enough for our current search, and ensure it gets searched first
 		if (entry) {
 			eval = -entry->eval + 10000;
-		} else {
+		}
+		else {
 			eval = -b.getEval();
 		}
 		b.undoMove();
 
-        eval_moves.emplace_back(eval, move);
+		eval_moves.emplace_back(eval, move);
+	}
+
+	std::sort(eval_moves.begin(), eval_moves.end(), [](const auto& a, const auto& b) {
+		return a.first > b.first; // Sort descending by eval
+		});
+
+	for (size_t i = 0; i < moves.size(); ++i) {
+		moves[i] = eval_moves[i].second;
+	}
+	return eval_moves;
+}
+*/
+
+std::vector<std::pair<int, Move>> Engine::sortMoves(std::vector<Move>& moves) {
+	std::vector<std::pair<int, Move>> hash_moves;
+    std::vector<std::pair<int, Move>> captures;
+	std::vector<std::pair<int, Move>> history_moves;
+	std::vector<std::pair<int, Move>> fallback_moves;
+	int piece_vals[7] = {0, 100, 320, 330, 500, 900 , 99999};
+    for (auto& move : moves) {
+		int eval = 0;
+		if (move.captured()) {
+			// MVV-LVA score: victim value * 10 - attacker value
+			captures.emplace_back(1000 + (10 * piece_vals[move.captured()] - piece_vals[move.piece()]), move);
+			continue;
+		}
+
+		b.doMove(move);
+		// Probe the transposition table
+		TTEntry* entry = probeTT(b.getHash());
+		// If we have a valid entry that's deep enough for our current search, and ensure it gets searched first
+		if (entry) {
+			hash_moves.emplace_back(-entry->eval, move);
+		} else if (history_table[b.us][move.from()][move.to()]){
+			history_moves.emplace_back(history_table[b.us][move.from()][move.to()], move);
+			//fallback_moves.emplace_back(-b.getEval(), move);
+		} else {
+			fallback_moves.emplace_back(-b.getEval(), move);
+		}
+		b.undoMove();
     }
 
-    std::sort(eval_moves.begin(), eval_moves.end(), [](const auto& a, const auto& b) {
+    std::ranges::sort(captures, [](const auto& a, const auto& b) {
         return a.first > b.first; // Sort descending by eval
     });
+	std::ranges::sort(hash_moves, [](const auto& a, const auto& b) {
+		return a.first > b.first; // Sort descending by eval
+		});
+	std::ranges::sort(history_moves, [](const auto& a, const auto& b) {
+		return a.first > b.first; // Sort descending by eval
+		});
+	std::ranges::sort(fallback_moves, [](const auto& a, const auto& b) {
+		return a.first > b.first; // Sort descending by eval
+		});
 
+	std::vector<std::pair<int, Move>> eval_moves;
+	eval_moves.reserve(moves.size());
+
+	if (captures.size()) eval_moves.insert(eval_moves.end(), captures.begin(), captures.end());
+	if (hash_moves.size()) eval_moves.insert(eval_moves.end(), hash_moves.begin(), hash_moves.end());
+	if (history_moves.size()) eval_moves.insert(eval_moves.end(), history_moves.begin(), history_moves.end());
+	if (fallback_moves.size()) eval_moves.insert(eval_moves.end(), fallback_moves.begin(), fallback_moves.end());
 	for (size_t i = 0; i < moves.size(); ++i) {
         moves[i] = eval_moves[i].second;
     }
@@ -284,7 +332,7 @@ std::vector<Move> Engine::getPrincipalVariation() const {
 
 void Engine::printPV(Move root_move, int score) const {
 	// Print the principal variation from root position (depth 0)
-	//std::vector<Move> pv = getPrincipalVariation();
+	std::vector<Move> pv = getPrincipalVariation();
 
 	std::cout << "info score cp " << score << " depth " << max_depth
 		<< " nodes " << nodes << " max_time " << max_time
@@ -293,68 +341,36 @@ void Engine::printPV(Move root_move, int score) const {
 		<< " hash_hits: " << hash_hits
 		<< " hash_miss: " << hash_miss
 		<< " pv ";
-
+	/*
 	for (const auto& pv_move : std::views::reverse(best_pv)) {
+		std::cout << pv_move.toUci() << " ";
+	}
+	*/
+	for (const auto& pv_move : pv) {
 		std::cout << pv_move.toUci() << " ";
 	}
 }
 
-void Engine::pruneTT(size_t max_size) {
-	if (tt.size() <= max_size) return;
-
-	// Create temporary map for entries we want to keep
-	robin_hood::unordered_map<u64, TTEntry> new_tt;
-	new_tt.reserve(max_size);
-
-	// Sort entries by importance (depth and age)
-	std::vector<std::pair<u64, TTEntry>> entries;
-	entries.reserve(tt.size());
-
-	for (const auto& [key, entry] : tt) {
-		entries.emplace_back(key, entry);
-	}
-
-	// Sort by depth (primary) and age (secondary)
-	std::sort(entries.begin(), entries.end(),
-	          [](const auto& a, const auto& b) {
-		          if (a.second.depth != b.second.depth)
-			          return a.second.depth > b.second.depth;
-		          return a.second.age > b.second.age;
-	          });
-
-	// Keep only the most valuable entries
-	for (size_t i = 0; i < max_size && i < entries.size(); ++i) {
-		new_tt[entries[i].first] = entries[i].second;
-	}
-
-	tt = std::move(new_tt);
-}
-
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth) {
-	const size_t MAX_TT_SIZE = 256000; // Adjust based on your needs
-
-	if (tt.size() >= MAX_TT_SIZE) {
-		pruneTT(MAX_TT_SIZE * 0.75); // Reduce to 75% of max size
-	}
+	const size_t MAX_TT_SIZE = 512000;
+		
 	if (tt.contains(hash_key)) {
 		if (tt[hash_key].depth < depth) {
 			//replace
 			tt[hash_key] = TTEntry{ score, u8(depth), u8(current_age), u8(max_depth), type };
 		}
 	} else {
-		tt[hash_key] = TTEntry{ score, u8(depth), u8(current_age), u8(max_depth), type };
+		if (tt.size() <= MAX_TT_SIZE) {
+			tt[hash_key] = TTEntry{ score, u8(depth), u8(current_age), u8(max_depth), type };
+		}
 	}
-}
-
-void Engine::updateTTAge() {
-	static u16 current_age = 0;
-	current_age++;
-
-	for (auto& [key, entry] : tt) {
+	/*
+	for (auto [key, entry] : tt) {
 		entry.age = current_age;
 	}
-
+	*/
 }
+
 
 bool Engine::checkTime() {
 	if ((1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC) > max_time) return true;
@@ -386,26 +402,36 @@ void Engine::calcTime() {
 
 int Engine::quiesce(int alpha, int beta) {
 	if (checkTime()) return -100000;
+	TTEntry* entry = probeTT(b.getHash());
+
+	if (entry) {
+		// Use the entry based on its bound type
+		if (entry->type == TType::EXACT) return entry->eval;
+		if (entry->type == TType::BETA && entry->eval >= beta) return entry->eval;  // Beta cutoff
+		if (entry->type == TType::ALPHA && entry->eval <= alpha) return entry->eval;  // Alpha cutoff
+	}
+
 	int stand_pat = b.getEval();
-	int score = stand_pat;
+	int best = stand_pat;
 	nodes++;
 
 	//delta prune
-	if (score < alpha - 950) return alpha;
+	if (stand_pat < alpha - 950) return alpha;
 
-	if (score >= beta) {
+	if (stand_pat >= beta) {
 		return beta;
 	}
 
-	if (alpha < score) {
-		alpha = score;
+	if (alpha < stand_pat) {
+		alpha = stand_pat;
 	}
 
 	std::vector<Move> captures;
 	captures.reserve(32);
 	b.genPseudoLegalCaptures(captures);
 	b.filterToLegal(captures);
-	sortMovesByEval(captures);
+	sortMoves(captures);
+
 	// Check for #M
 	if (!captures.size()) {
 		if (b.isCheck()) {
@@ -421,17 +447,29 @@ int Engine::quiesce(int alpha, int beta) {
 
 
 		b.doMove(move);
-		score = -quiesce(-beta, -alpha);
+		int score = -quiesce(-beta, -alpha);
 		b.undoMove();
 
-
+		if (score >= beta) {
+			//beta cutoff, fail high, too good 
+			storeTTEntry(b.getHash(), score, TType::BETA, 0);
+			return score;
+		}
+		if (score > best) {
+			best = score;
+		}
 		if (score > alpha) {
-			if (score >= beta)
-				return beta;
 			alpha = score;
 		}
 	}
-	
+	if (best <= alpha) {
+		// fail-low node - none of the moves improved alpha
+		storeTTEntry(b.getHash(), alpha, TType::ALPHA, 0);
+		return alpha;
+	}
+
+	// exact score node
+	storeTTEntry(b.getHash(), best, TType::EXACT, 0);
 	return alpha;
 }
 

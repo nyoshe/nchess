@@ -37,7 +37,8 @@ bool Board::operator==(const Board& other) const {
 		us != other.us ||
 		castle_flags != other.castle_flags ||
 		ep_square != other.ep_square ||
-		state_stack != other.state_stack) {
+		state_stack != other.state_stack ||
+		hash != other.hash) {
 		return false;
 	}
 		
@@ -59,8 +60,30 @@ void Board::setOccupancy() {
 }
 
 void Board::doMove(Move move) {
-	state_stack.emplace_back(ep_square, castle_flags, move, eval, hash);
+	state_stack.emplace_back(ep_square, castle_flags, move, eval, hash, half_move);
+	//null move
+	if (move.from() == move.to()) {
+		us = !us;
+		//update bare minimum zobrist, clear ep square
+		hash ^= z.side;
+		if (state_stack.back().ep_square != -1) hash ^= z.ep_file[state_stack.back().ep_square & 0x7];
+		if (ep_square != -1) hash ^= z.ep_file[ep_square & 0x7];
 
+		pos_history[hash]++;
+
+		eval = evalUpdate();
+		// Increment ply count  
+		ply++;
+		ep_square = -1;
+		half_move++;
+		return;
+	}
+
+	if (move.piece() == ePawn || move.captured()) {
+		half_move = 0;
+	} else {
+		half_move++;
+	}
 	movePiece(move.from(), move.to());
 
 	u8 p = move.piece();
@@ -161,11 +184,17 @@ void Board::undoMove() {
 	castle_flags = state_stack.back().castle_flags;
 	eval = state_stack.back().eval;
 	hash = state_stack.back().hash;
+	half_move = state_stack.back().half_move;
 	state_stack.pop_back();
 	// Switch side to move back
 
 	// Decrement ply count
 	ply--;
+
+	//assume null move
+	if (move.from() == move.to()) {
+		return;
+	}
 
 	u8 from = move.from();
 	u8 to = move.to();
@@ -944,6 +973,7 @@ int16_t Board::evalUpdate() const {
 
 	out += (mg_val + (game_phase * eg_val - mg_val) / 24);
 
+	out += 2 * (getMobility(eWhite) - getMobility(eBlack));
 	
 	//count doubled pawns
 	out -= 50 * BB::popcnt(boards[eWhite][ePawn] & (boards[eWhite][ePawn] << 8));
@@ -960,6 +990,7 @@ int16_t Board::evalUpdate() const {
 	*/
 
 	//count isolated pawns
+
 
 	out = us == eWhite ? out : -out;
 	
@@ -1052,11 +1083,113 @@ void Board::reset() {
 	hash = calcHash();
 }
 
+std::vector<Move> Board::getLastMoves(int n_moves) const {
+	std::vector<Move> last_moves;
+	const size_t available_moves = state_stack.size();
+	const size_t moves_to_return = min(static_cast<size_t>(n_moves), available_moves);
+
+	last_moves.reserve(moves_to_return);
+	for (size_t i = 0; i < moves_to_return; ++i) {
+		last_moves.push_back(state_stack[available_moves - 1 - i].move);
+	}
+
+	return last_moves;
+}
+
 u64 Board::getHash() {
 	return hash;
 }
 
 bool Board::is3fold() {
 	return pos_history.contains(hash) && pos_history.at(hash) >= 3;
+}
+
+u64 Board::calcHash() const {
+	u64 out_hash = 0;
+	for (int sq = 0; sq < 64; sq++) {
+		if (piece_board[sq] != eNone) {
+			out_hash ^= z.piece_at[sq * 12 + (piece_board[sq] - 1) + (getSide(sq) * 6)];
+		}
+	}
+	out_hash ^= z.castle_rights[castle_flags];
+	if (us) out_hash ^= z.side;
+	if (ep_square != -1) out_hash ^= z.ep_file[ep_square & 0x7];
+	return out_hash;
+}
+
+void Board::updateZobrist(Move move) {
+	u8 p = move.piece();
+	hash ^= z.side;
+	hash ^= z.piece_at[(move.from() * 12) + (move.piece() - 1) + (!us * 6)]; //invert from square hash
+
+	if (move.promotion() != eNone) {
+		hash ^= z.piece_at[(move.to() * 12) + (move.promotion() - 1) + (!us * 6)]; 
+	} else {
+		hash ^= z.piece_at[(move.to() * 12) + (move.piece() - 1) + (!us * 6)];
+	}
+        
+	if (move.captured() != eNone) {
+		if (move.isEnPassant()) {
+			hash ^= z.piece_at[((state_stack.end() - 2)->move.to() * 12) + (ePawn - 1) + (us * 6)]; //add captured piece
+		} else {
+			hash ^= z.piece_at[(move.to() * 12) + (move.captured() - 1) + (us * 6)]; //add captured piece
+		}
+	}
+
+	if (state_stack.back().castle_flags != castle_flags) {
+		hash ^= z.castle_rights[state_stack.back().castle_flags];
+		hash ^= z.castle_rights[castle_flags];
+	}
+
+	if (state_stack.back().ep_square != -1) hash ^= z.ep_file[state_stack.back().ep_square & 0x7];
+	if (ep_square != -1) hash ^= z.ep_file[ep_square & 0x7];
+
+	if (p == eKing) {
+		// Move the rook if castling
+		if (std::abs((int)move.to() - (int)move.from()) == 2) {
+			switch (move.to()) {
+			case g1: 
+				hash ^= z.piece_at[(h1 * 12) + (eRook - 1) + (!us * 6)];
+				hash ^= z.piece_at[(f1 * 12) + (eRook - 1) + (!us * 6)];
+				break; // King-side castling for white
+			case c1: 
+				hash ^= z.piece_at[(a1 * 12) + (eRook - 1) + (!us * 6)]; 
+				hash ^= z.piece_at[(d1 * 12) + (eRook - 1) + (!us * 6)];
+				break; // Queen-side castling for white
+			case g8:
+				hash ^= z.piece_at[(h8 * 12) + (eRook - 1) + (!us * 6)];
+				hash ^= z.piece_at[(f8 * 12) + (eRook - 1) + (!us * 6)];
+				break;// King-side castling for black
+			case c8:
+				hash ^= z.piece_at[(a8 * 12) + (eRook - 1) + (!us * 6)];
+				hash ^= z.piece_at[(d8 * 12) + (eRook - 1) + (!us * 6)];
+				break; // Queen-side castling for black
+			default: throw std::invalid_argument("Invalid castling move");
+			}
+		}
+	}
+}
+
+int Board::getMobility(bool side) const {
+	int mobility = 0;
+	for (u8 p = 2 ; p <= eKing; p++) {
+		u64 attackers = boards[side][p];
+		u64 all_occ = boards[eBlack][0] | boards[eWhite][0];
+		u64 our_occ = boards[side][0];
+		unsigned long from;
+		while (attackers) {
+			BB::bitscan_reset(from, attackers);
+			u64 targets;
+			switch (p) {
+			case eKnight: targets = BB::knight_attacks[from] & ~our_occ; break;
+			case eBishop: targets = BB::get_bishop_attacks(from, all_occ) & ~our_occ; break;
+			case eRook: targets = BB::get_rook_attacks(from, all_occ) & ~our_occ; break;
+			case eQueen: targets = BB::get_queen_attacks(from, all_occ) & ~our_occ; break;
+			case eKing: targets = BB::king_attacks[from] & ~our_occ; break;
+			}
+			mobility += BB::popcnt(targets);
+		}
+	}
+	return mobility;
 }
 

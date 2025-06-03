@@ -35,6 +35,7 @@ private:
 	Move best_move;
 	static constexpr int MAX_PLY = 64;
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
+	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	std::array<int, MAX_PLY> pv_length;
 	std::vector<Move> best_pv;
 	std::vector<BoardState> best_pv_state;
@@ -43,6 +44,7 @@ private:
 	u16 max_depth = 0;
 	int nodes = 0;
 	int current_age = 0;
+	bool is_pv = false;
 
     // Timer variables
     std::clock_t start_time = 0;
@@ -65,14 +67,13 @@ public:
 	void setBoardUCI(std::istringstream& uci);
 
 	Move search(int depth);
-	std::vector<std::pair<int, Move>> sortMovesByEval(std::vector<Move>& moves);
+	std::vector<std::pair<int, Move>> sortMoves(std::vector<Move>& moves);
 	std::vector<Move> getPrincipalVariation() const;
 
 	void printPV(Move root_move, int score) const;
 
-	void pruneTT(size_t max_size);
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth);
-	void updateTTAge();
+
 	TTEntry* probeTT(u64 hash_key) {
 		auto it = tt.find(hash_key);
 		if (it != tt.end()) {
