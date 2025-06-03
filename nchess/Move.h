@@ -69,6 +69,7 @@ public:
 			case eQueen: out += "q"; break;
 			default: break; // No promotion
 		}
+
 		return out;
 	}
 

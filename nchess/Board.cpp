@@ -59,11 +59,14 @@ void Board::setOccupancy() {
 }
 
 void Board::doMove(Move move) {
+	state_stack.emplace_back(ep_square, castle_flags, move, eval, hash);
+
 	movePiece(move.from(), move.to());
+
 	u8 p = move.piece();
 
 	// Add move to stack, along with previous en passant square and castle flags
-	state_stack.emplace_back(ep_square, castle_flags, move, eval);
+
 
 	// Handle promotion  
 	if (move.promotion() != eNone) {
@@ -106,7 +109,6 @@ void Board::doMove(Move move) {
 		}
 	}
 
-	//there really has to be a better way
 	switch (move.to()) {
 		case h1: castle_flags &= ~wShortCastleFlag; break; // White king-side rook
 		case a1: castle_flags &= ~wLongCastleFlag; break; // White queen-side rook
@@ -115,22 +117,18 @@ void Board::doMove(Move move) {
 		default: break;
 	}
 
-
 	// Update en passant square
 	if (p == ePawn && std::abs((int)move.to() - (int)move.from()) == 16) {
-		// Set ep_square to the square behind the pawn after a double push
 		ep_square = (move.from() + move.to()) / 2;
 	}
 	else {
 		ep_square = -1;
 	}
-	// Update side to move  
-	us ^= 1;
 
-	hash ^= z_val[castle_flags];
-	hash ^= z_val[16 + ep_square & 0x7];
-	if (us) hash ^= z_val[24];
-	hash ^= z_val[25 + (move.from() << 3 | move.to())];
+	us = !us;
+	updateZobrist(move);
+
+	pos_history[hash]++;
 
 	eval = evalUpdate();
 	// Increment ply count  
@@ -150,17 +148,21 @@ void Board::undoMove() {
 	}
 	// Pop the last move
 	Move move = state_stack.back().move;
+	
+	
+	if (pos_history.contains(hash)) {
+		pos_history[hash]--;
+		if (pos_history[hash] == 0)  pos_history.erase(hash);
+	}
+
+	us = !us;
+
 	ep_square = state_stack.back().ep_square;
 	castle_flags = state_stack.back().castle_flags;
 	eval = state_stack.back().eval;
+	hash = state_stack.back().hash;
 	state_stack.pop_back();
-	hash ^= z_val[castle_flags];
-	hash ^= z_val[16 + ep_square & 0x7];
-	if (us) hash ^= z_val[24];
-	hash ^= z_val[25 + (move.from() << 3 | move.to())];
-
 	// Switch side to move back
-	us ^= 1;
 
 	// Decrement ply count
 	ply--;
@@ -447,6 +449,7 @@ void Board::loadFen(std::istringstream& fen_stream) {
 
 	// Recompute occupancy
 	setOccupancy();
+	hash = calcHash();
 	runSanityChecks();
 }
 
@@ -846,8 +849,10 @@ void Board::filterToLegal(std::vector<Move> &moves) {
 				continue;
 			}
 		}
+
 		doMove(move);
-		// Find our king's square after the move
+		
+
 		us ^= 1;
 		bool inCheck = isCheck();
 		us ^= 1;
@@ -988,6 +993,7 @@ void Board::runSanityChecks() const {
 		std::cout << boardString();
 		throw std::logic_error("black bitboard mismatch");
 	}
+	
 }
 
 void Board::printMoves() const {
@@ -1037,17 +1043,23 @@ void Board::reset() {
 	eval = 0;
 	ply = 0;
 	hash = 0;
+	half_move = 0;
+	pos_history.clear();
 	us = eWhite;
 	castle_flags = 0b1111;
 	ep_square = -1;
 	state_stack.clear();
 
-
 	//legal_moves.reserve(256);
 	setOccupancy();
+	hash = calcHash();
 }
 
 u64 Board::getHash() {
 	return hash;
+}
+
+bool Board::is3fold() {
+	return pos_history.contains(hash) && pos_history.at(hash) >= 3;
 }
 

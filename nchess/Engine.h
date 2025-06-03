@@ -4,11 +4,18 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_map>
+enum class TType {
+	EXACT,
+	ALPHA,
+	BETA
+};
+
 struct TTEntry {
 	int eval = 0;
-	u16 depth = 0;
-	u16 age = 0;
-	u16 search_depth = 0;
+	u8 depth = 0;
+	u8 age = 0;
+	u8 search_depth = 0;
+	TType flag = TType::EXACT;
 };
 
 struct TimeControl {
@@ -27,6 +34,7 @@ private:
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 	std::array<int, MAX_PLY> pv_length;
 	std::vector<Move> best_pv;
+	std::vector<BoardState> best_pv_state;
 	// Engine state variables
 	int start_ply = 0;
 	u16 max_depth = 0;
@@ -60,7 +68,7 @@ public:
 	void printPV(Move root_move, int score) const;
 
 	void pruneTT(size_t max_size);
-	void storeTTEntry(u64 hash_key, int16_t eval, u8 depth);
+	void storeTTEntry(u64 hash_key, int score, int alpha, int beta, u8 depth);
 	void updateTTAge();
 
 	bool checkTime();

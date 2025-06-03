@@ -117,7 +117,30 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 	if (search_ply >= MAX_PLY - 1) return b.getEval(); // Prevent array overflow
 	if (depthleft <= 0) return quiesce(alpha, beta);
 
+	if (b.is3fold()) {
+		return 0;
+	}
+	/*
+	if (tt.contains(b.getHash())) {
+		TTEntry& entry = tt[b.getHash()];
+		if (entry.depth >= depthleft) {
+			int score = entry.eval;
 
+			switch (entry.flag) {
+			case TType::EXACT:
+				return score;
+			case TType::ALPHA:
+				if (score <= alpha)
+					return alpha;
+				break;
+			case TType::BETA:
+				if (score >= beta)
+					return beta;
+				break;
+			}
+		}
+	}
+	*/
 	int best = -100000;
 
 	// Clear this node's PV
@@ -133,30 +156,37 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft) {
 		return b.isCheck() ? -99999 + search_ply : 0;
 	}
 
-	sortMovesByEval(legal_moves);
 
+	
+	sortMovesByEval(legal_moves);
+	int score = 0;
 	for (auto& move : legal_moves) {
 
 		b.doMove(move);
-
-		int score = -alphaBeta(-beta, -alpha, depthleft - 1);
-
+		
+		score = -alphaBeta(-beta, -alpha, depthleft - 1);
 		b.undoMove();
+
 
 		if (score > best) {
 			best = score;
 			if (score > alpha) {
-				if (max_depth >= best_pv.size()) {
-					best_pv = b.getLastMoves(search_ply);
-				}
+
+				best_pv = b.getLastMoves(search_ply);
+				best_pv_state = b.state_stack;
+				
+				//storeTTEntry(b.getHash(), score, b.ply);
 				alpha = score;
 			}
 		}
 		if (score >= beta) {
-			return best;
+			//storeTTEntry(b.getHash(), beta, alpha, beta, depthleft);
+			return beta;
 		}
 	}
-	//storeTTEntry(b.getHash(), alpha, b.ply);
+
+
+	//storeTTEntry(b.getHash(), best, alpha, beta, depthleft);
 	return best;
 
 }
@@ -240,14 +270,27 @@ void Engine::pruneTT(size_t max_size) {
 	tt = std::move(new_tt);
 }
 
-void Engine::storeTTEntry(u64 hash_key, int16_t eval, u8 depth) {
-	const size_t MAX_TT_SIZE = 1000000; // Adjust based on your needs
+void Engine::storeTTEntry(u64 hash_key, int score, int alpha, int beta, u8 depth) {
+	const size_t MAX_TT_SIZE = 256000; // Adjust based on your needs
 
 	if (tt.size() >= MAX_TT_SIZE) {
 		pruneTT(MAX_TT_SIZE * 0.75); // Reduce to 75% of max size
 	}
 
-	tt[hash_key] = TTEntry{eval, u16(b.ply), u16(current_age), max_depth /* current age */ };
+	TType flag;
+	if (score <= alpha) {
+		flag = TType::ALPHA;      // Upper bound
+		score = alpha;            // Store upper bound score
+	}
+	else if (score >= beta) {
+		flag = TType::BETA;       // Lower bound
+		score = beta;             // Store lower bound score
+	}
+	else {
+		flag = TType::EXACT;      // Exact score
+	}
+
+	tt[hash_key] = TTEntry{score, u8(depth), u8(current_age), u8(max_depth), flag};
 }
 
 void Engine::updateTTAge() {
@@ -272,6 +315,7 @@ void Engine::calcTime() {
 	std::vector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
+
 	float num_moves = legal_moves.size();
 	float factor = num_moves / 500.0;
 
@@ -320,23 +364,19 @@ int Engine::quiesce(int alpha, int beta) {
 	for (auto& move : captures) {
 		if (move.captured() == eKing) return 99999 - (b.ply - start_ply);
 
+
 		b.doMove(move);
-
-		//if (tt.contains(b.getHash())) {
-		//	score = tt[b.getHash()].eval;
-		//} else {
 		score = -quiesce(-beta, -alpha);
-		//s}
-
 		b.undoMove();
+
 
 		if (score > alpha) {
 			if (score >= beta)
 				return beta;
-			//storeTTEntry(b.getHash(), score, b.ply);
 			alpha = score;
 		}
 	}
+	
 	return alpha;
 }
 
