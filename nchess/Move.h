@@ -75,5 +75,7 @@ public:
 
 	[[nodiscard]] uint32_t raw() const { return data; }
 
-	auto operator<=>(const Move&) const = default;
+	[[nodiscard]] constexpr bool operator==(const Move& other) const {
+		return data == other.data;
+	}
 };

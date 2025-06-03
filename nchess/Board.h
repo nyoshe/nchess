@@ -77,7 +77,7 @@ public:
     u16 half_move = 0;
 	Board();
     // Copy constructor
-    Board(const Board& other);
+    Board(const Board& other) = default;
 
 	// Equality operator
     bool operator==(const Board& other) const;
@@ -127,6 +127,7 @@ public:
     [[nodiscard]] int16_t evalUpdate() const;
 
     [[nodiscard]] int16_t getEval() const { return eval; };
+
 
     void runSanityChecks() const;
     void printMoves() const;

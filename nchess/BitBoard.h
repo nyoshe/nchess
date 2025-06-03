@@ -82,6 +82,7 @@ namespace BB {
     
     inline u64 files[8];
     inline u64 ranks[8];
+    inline u64 neighbor_files[8];
 
 
     inline Pos dirs[8] = {
@@ -202,6 +203,8 @@ namespace BB {
 
     inline void init()
     {
+
+
         for (int i = 0; i < 7; i++) {
             for (int square = 0; square < 64; square++) {
                 mg_table[i][square] += mg_p_val[i];
@@ -313,6 +316,10 @@ namespace BB {
         for (int rank = 0; rank < 8; rank++) {
             ranks[rank] = 0;
             ranks[rank] |= u64(0x00000000000000FF) << (rank * 8);
+        }
+
+        for (int file = 0; file < 8; file++) {
+            neighbor_files[file] = (file < 7 ? BB::files[file + 1] : 0) | (file > 0 ? BB::files[file - 1] : 0);
         }
 
         std::vector<std::vector<u64>> blocker_combos;
@@ -475,6 +482,15 @@ namespace BB {
     // retrieve attacks for queen as bitboard
     inline u64 get_queen_attacks(const int square, const u64 occupancy) {
         return get_rook_attacks(square, occupancy) | get_bishop_attacks(square, occupancy);
+    }
+
+    inline u64 get_pawn_attacks(const Direction dir, const Side side, const u64 pawns, const u64 occupancy) {
+	    if (dir == eEast) {
+            return ((side == eWhite) ? ((pawns & ~BB::files[7]) << 9) : ((pawns & ~BB::files[7]) >> 7)) & occupancy;
+	    }
+        else if (dir == eWest) {
+            return ((side == eWhite) ? ((pawns & ~BB::files[0]) << 7) : ((pawns & ~BB::files[0]) >> 9)) & occupancy;
+        }
     }
 }
 

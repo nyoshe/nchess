@@ -154,45 +154,53 @@ TEST(BoardTest, TestGames) {
     if (!file) {
         std::cout << "Current directory: " << std::filesystem::current_path() << std::endl;
     }
-    double sum_squared_diff = 0.0;
-    int move_count = 0;
+    
     auto allGames = pgn::read_pgn_file(file);
-    for (int i = 0; i < 1000; i++) {
-        
-        for (auto gameMove : allGames[i]) {
-            Move move = board.moveFromSan(gameMove.san);
+    for (int var = 0; var < 10; var+=1) {
+        double sum_squared_diff = 0.0;
+        int move_count = 0;
+        for (int i = 0; i < 1000; i++) {
 
-            Board test_board = board;
-            board.doMove(move);
-            board.undoMove();
-            EXPECT_EQ(board, test_board);
+            for (auto gameMove : allGames[i]) {
+                Move move = board.moveFromSan(gameMove.san);
 
-            board.doMove(move);
+                Board test_board = board;
+                board.doMove(move);
+                board.undoMove();
 
-            double diff = static_cast<double>(board.getEval()) - static_cast<double>(gameMove.eval);
+                EXPECT_EQ(board, test_board);
 
-            //excludes checks from static eval
-        	if (std::abs(diff) <= 9000) {
-                sum_squared_diff += diff * diff;
-                move_count++;
+                board.doMove(move);
+
+                double diff = static_cast<double>(board.us ? -board.evalUpdate() : board.evalUpdate()) - static_cast<double>(gameMove.eval);
+
+                //excludes checks from static eval
+                if (std::abs(diff) <= 50000) {
+
+                    sum_squared_diff += std::sqrt(diff * diff);
+                    move_count++;
+                }
+
             }
-            
-        }
 
-        for (int i = 0; i < allGames.size(); i++) {
-            board.undoMove();
-        }
+            for (int i = 0; i < allGames.size(); i++) {
+                board.undoMove();
+            }
 
-        
-        EXPECT_EQ(board.getOccupancy(), 0xFFFF00000000FFFF);
+
+            EXPECT_EQ(board.getOccupancy(), 0xFFFF00000000FFFF);
+        }
+        if (move_count > 0) {
+            double mean_square_diff = sum_squared_diff / move_count;
+            // 240.605
+            std::cout << "var: " << var << std::endl;
+            std::cout << "Mean square difference: " << mean_square_diff << std::endl;
+        }
+        else {
+            std::cout << "No moves to compare." << std::endl;
+        }
     }
-    if (move_count > 0) {
-        double mean_square_diff = sum_squared_diff / move_count;
-        std::cout << "Mean square difference: " << mean_square_diff << std::endl;
-    }
-    else {
-        std::cout << "No moves to compare." << std::endl;
-    }
+    
 }
 
 TEST(BoardTest, PerftPositions) {

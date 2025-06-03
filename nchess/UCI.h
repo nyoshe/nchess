@@ -77,10 +77,11 @@ public:
             else if (token == "test")
             {
                 /*
-                 *fastchess --- Warning; Illegal pv move f3h2 from new
-					Info; info score cp 84 depth 3 nodes 4544 max_time 332 given_time 4189 time 5 pv c3b5 d6d8 f3h2 
-                 */
-                std::istringstream test("fen rnb1kbnr/ppp1pppp/8/4q3/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4 moves f1e2 e5d6 ");
+                 * Warning; Illegal pv move c1d2 from new
+                 Info; info score cp 47 depth 3 nodes 22286 max_time 283 given_time 3687 time 15 hash_hits: 302761 hash_miss: 5864413 pv c8e6 c2c4 d4c3 c1d2 
+Position; fen rnbqk1nr/ppp1ppbp/6p1/4P3/3p4/3P2Q1/PPP2PPP/RNB1KBNR b KQkq - 3 5
+Moves; b8c6 g1f3 g8h6 c1h6 g7h6 b1d2 e8g8 e1c1 f7f6 d1e1  */
+                std::istringstream test("fen rnbqk1nr/ppp1ppbp/6p1/4P3/3p4/3P2Q1/PPP2PPP/RNB1KBNR b KQkq - 3 5 moves b8c6 g1f3 g8h6 c1h6 g7h6 b1d2 e8g8 e1c1 f7f6 d1e1 ");
                 engine_.tc.winc = 100000000;
                 engine_.tc.binc = 100000000;
             	setupBoard(test);
