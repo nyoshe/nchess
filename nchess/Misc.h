@@ -41,6 +41,8 @@ enum Square : u8 {
 	a8, b8, c8, d8, e8, f8, g8, h8
 };
 
+inline int piece_vals[7] = { 0, 100, 320, 330, 500, 900 , 99999 };
+
 struct Pos {
 	i8 f; // 0-7
 	i8 r; // 0-7

@@ -39,7 +39,7 @@ private:
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	std::array<int, MAX_PLY> pv_length;
-
+	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
 	// Engine state variables
 	int start_ply = 0;
 	u16 max_depth = 0;
