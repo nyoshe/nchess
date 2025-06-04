@@ -76,17 +76,16 @@ public:
             }
             else if (token == "test")
             {
-                /*
-                 * Warning; Illegal pv move c1d2 from new
-                 Info; info score cp 47 depth 3 nodes 22286 max_time 283 given_time 3687 time 15 hash_hits: 302761 hash_miss: 5864413 pv c8e6 c2c4 d4c3 c1d2 
-Position; fen rnbqk1nr/ppp1ppbp/6p1/4P3/3p4/3P2Q1/PPP2PPP/RNB1KBNR b KQkq - 3 5
-Moves; b8c6 g1f3 g8h6 c1h6 g7h6 b1d2 e8g8 e1c1 f7f6 d1e1  */
-                std::istringstream test("fen rnbqk1nr/ppp1ppbp/6p1/4P3/3p4/3P2Q1/PPP2PPP/RNB1KBNR b KQkq - 3 5 moves b8c6 g1f3 g8h6 c1h6 g7h6 b1d2 e8g8 e1c1 f7f6 d1e1 ");
+                /*Warning; Illegal pv move f4g3 from new
+Info; info score cp -1360 depth 4 nodes 2625 nps 2625000 hash_hits: 3506560 hash_miss: 24943868 pv g4g3 f6g7 g3f4 g7g6 f4g3
+Position; fen r2qkb1r/1ppn1ppp/p3bn2/3p4/3P1B2/2NBPN2/PP3PPP/R2QK2R w KQkq - 4 9
+Moves; e1g1 f8b4 d1e2 e8g8 a1e1 b4c3 b2c3 f6e4 e2c2 c7c6 d3e4 d5e4 f3d2 f7f5 f2f3 e4f3 d2f3 d7f6 f3e5 a8c8 h2h3 c6c5 c2b1 b7b5 b1b2 f6e4 e1d1 d8d5 b2a3 d5a2 a3a2 e6a2 d4c5 a2b3 d1d7 g7g5 f4h2 c8c5 e5d3 c5d5 d7d5 b3d5 f1c1 g5g4 h3g4 f5g4 d3b4 d5a8 h2f4 a8b7 f4e5 g4g3 c3c4 f8d8 c4c5 e4c5 e5g3 d8d2 c1c2 d2c2 b4c2 b7e4 c2d4 b5b4 g3d6 b4b3 d4e2 b3b2 e2c3 c5a4 d6a3 a4c3 a3b2 c3b1 g1f2 a6a5 g2g3 a5a4 b2f6 a4a3 f2e1 a3a2 g3g4 g8f7 f6e5 b1a3 e1f2 a3c4 e5d4 h7h6 f2g3 c4e3 g3f4 e3c2 d4e5 e4c6 g4g5 h6g5 f4g5 a2a1q e5a1 c2a1 g5f4 a1c2 f4f5 c2d4 f5e5 d4f3 e5f5 c6d5 f5g4 f7f6 g4f4 f6g6 f4g4 f3e5 g4f4 e5f3 f4g4 g6f6*/
+                std::istringstream test("fen r2qkb1r/1ppn1ppp/p3bn2/3p4/3P1B2/2NBPN2/PP3PPP/R2QK2R w KQkq - 4 9 moves e1g1 f8b4 d1e2 e8g8 a1e1 b4c3 b2c3 f6e4 e2c2 c7c6 d3e4 d5e4 f3d2 f7f5 f2f3");
                 engine_.tc.winc = 100000000;
                 engine_.tc.binc = 100000000;
             	setupBoard(test);
-                engine_.b.printBitBoards();
                 engine_.b.printBoard();
+                std::cout << engine_.b.boardString();
                 std::istringstream go_stream("go movetime 10000000");
                 handleGo(go_stream);
             }

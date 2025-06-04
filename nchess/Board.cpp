@@ -5,8 +5,6 @@ Board::Board() {
 	reset();
 }
 
-
-
 bool Board::operator==(const Board& other) const {
 	for (int side = 0; side < 2; ++side) {
 		for (int piece = 0; piece < 7; ++piece) {
@@ -55,8 +53,6 @@ void Board::doMove(Move move) {
 		if (state_stack.back().ep_square != -1) hash ^= z.ep_file[state_stack.back().ep_square & 0x7];
 		if (ep_square != -1) hash ^= z.ep_file[ep_square & 0x7];
 
-		pos_history[hash]++;
-
 		eval = evalUpdate();
 		// Increment ply count  
 		ply++;
@@ -73,9 +69,6 @@ void Board::doMove(Move move) {
 	movePiece(move.from(), move.to());
 
 	u8 p = move.piece();
-
-	// Add move to stack, along with previous en passant square and castle flags
-
 
 	// Handle promotion  
 	if (move.promotion() != eNone) {
@@ -137,7 +130,7 @@ void Board::doMove(Move move) {
 	us = !us;
 	updateZobrist(move);
 
-	pos_history[hash]++;
+	//pos_history[hash]++;
 
 	eval = evalUpdate();
 	// Increment ply count  
@@ -157,15 +150,8 @@ void Board::undoMove() {
 	}
 	// Pop the last move
 	Move move = state_stack.back().move;
-	
-	
-	if (pos_history.contains(hash)) {
-		pos_history[hash]--;
-		if (pos_history[hash] == 0)  pos_history.erase(hash);
-	}
 
 	us = !us;
-
 	ep_square = state_stack.back().ep_square;
 	castle_flags = state_stack.back().castle_flags;
 	eval = state_stack.back().eval;
@@ -860,10 +846,16 @@ void Board::filterToLegal(std::vector<Move> &moves) {
 				continue;
 			}
 		}
+		if (is3fold()) {
+			moves.erase(moves.begin() + i);
+			continue;
+		}
 
 		doMove(move);
-		
-
+		if (half_move > 100) {
+			moves.erase(moves.begin() + i);
+			continue;
+		}
 		us ^= 1;
 		bool inCheck = isCheck();
 		us ^= 1;
@@ -877,6 +869,18 @@ void Board::filterToLegal(std::vector<Move> &moves) {
 		}
 	}
 
+}
+
+bool Board::isLegal(Move move)  {
+	std::vector<Move> moves;
+	genPseudoLegalMoves(moves);
+	filterToLegal(moves);
+	for (auto& legal_move : moves) {
+		if (legal_move == move) {
+			return true;
+		}
+	}
+	return false;
 }
 
 u64 Board::getAttackers(int square) const {
@@ -893,7 +897,6 @@ u64 Board::getAttackers(int square, bool side) const {
 	// Check pawns  
 	int left_capture = (side == eBlack) ? -7 : 9;
 	int right_capture = (side == eBlack) ? -9 : 7;
-
 
     if ((square % 8) != 7) 
 		attackers |= BB::set_bit(square + left_capture) & boards[!side][ePawn];
@@ -980,7 +983,7 @@ int16_t Board::evalUpdate() const {
 
 	//single defenders
 	out += 3 * (BB::popcnt(w_east_defenders | w_west_defenders) - BB::popcnt(b_east_defenders | b_west_defenders));
-	out += 4 * (getMobility(eWhite) - getMobility(eBlack));
+	//out += 4 * (getMobility(eWhite) - getMobility(eBlack));
 	//double defenders
 	//out += var * (BB::popcnt(w_east_defenders & w_west_defenders) - BB::popcnt(b_east_defenders & b_west_defenders));
 	out = us == eWhite ? out : -out;
@@ -1042,8 +1045,6 @@ void Board::reset() {
 	boards[eWhite][eKing] = 0b00010000;
 	boards[eBlack][eKing] = (u64(0b00010000) << 56);
 
-
-
 	// Set up piece_board
 	static const u8 initial_piece_board[64] = {
 		eRook,   eKnight, eBishop, eQueen,  eKing,   eBishop, eKnight, eRook,
@@ -1063,7 +1064,6 @@ void Board::reset() {
 	ply = 0;
 	hash = 0;
 	half_move = 0;
-	pos_history.clear();
 	us = eWhite;
 	castle_flags = 0b1111;
 	ep_square = -1;
@@ -1077,11 +1077,11 @@ void Board::reset() {
 std::vector<Move> Board::getLastMoves(int n_moves) const {
 	std::vector<Move> last_moves;
 	const size_t available_moves = state_stack.size();
-	const size_t moves_to_return = min(static_cast<size_t>(n_moves), available_moves);
+	const size_t moves_to_return = std::min(static_cast<size_t>(n_moves), available_moves);
 
 	last_moves.reserve(moves_to_return);
-	for (size_t i = 0; i < moves_to_return; ++i) {
-		last_moves.push_back(state_stack[available_moves - 1 - i].move);
+	for (size_t i = moves_to_return; i; --i) {
+		last_moves.push_back(state_stack[available_moves - i].move);
 	}
 
 	return last_moves;
@@ -1092,7 +1092,17 @@ u64 Board::getHash() {
 }
 
 bool Board::is3fold() {
-	return pos_history.contains(hash) && pos_history.at(hash) >= 3;
+	if (state_stack.size() < half_move || state_stack.empty()) return false;
+	int counter = 0;
+	for (int i = 0; i < half_move; i++) {
+		if (state_stack[state_stack.size() - i - 1].hash == hash) {
+			counter++;
+		}
+	}
+	if (counter >= 2) {
+		return true;
+	}
+	return false;
 }
 
 u64 Board::calcHash() const {
@@ -1110,7 +1120,7 @@ u64 Board::calcHash() const {
 
 void Board::updateZobrist(Move move) {
 	u8 p = move.piece();
-	hash ^= z.side;
+	if (us) hash ^= z.side;
 	hash ^= z.piece_at[(move.from() * 12) + (move.piece() - 1) + (!us * 6)]; //invert from square hash
 
 	if (move.promotion() != eNone) {

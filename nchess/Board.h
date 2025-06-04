@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <io.h>
 #include <fcntl.h>
+#define NOMINMAX
 #include <Windows.h>
 #include <stdio.h>
 #include <vector>
@@ -24,12 +25,13 @@ inline u64 rnd64()
 
 
 struct BoardState {
+    u64 hash = 0;
     i8 ep_square = -1;
     u8 castle_flags = 0b1111; // 0bKQkq
     Move move;
     int eval = 0;
     u16 half_move;
-    u64 hash = 0;
+    
     BoardState(int ep_square, u8 castle_flags, Move move, int16_t eval, u64 hash, u16 half_move)
         : ep_square(ep_square), castle_flags(castle_flags), move(move), eval(eval), hash(hash), half_move(half_move) {
     };
@@ -69,7 +71,6 @@ private:
     u64 hash = 0;
     u8 castle_flags = 0b1111;
 	int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
-    robin_hood::unordered_map < u64, int > pos_history;
 public:
     std::vector<BoardState> state_stack;
     bool us = eWhite;
@@ -108,6 +109,7 @@ public:
 
 	void genPseudoLegalMoves(std::vector<Move>& moves);
     void filterToLegal(std::vector<Move>& pseudo_moves);
+    bool isLegal(Move move) ;
 
 
 	//get index of all attackers of a square
