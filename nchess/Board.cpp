@@ -1135,7 +1135,7 @@ void Board::updateZobrist(Move move) {
 	if (move.captured() != eNone) {
 		if (move.isEnPassant()) {
 			hash ^= z.piece_at[((state_stack.end() - 2)->move.to() * 12) + (ePawn - 1) + (us * 6)]; //invert captured piece
-			hash ^= z.piece_at[(move.to() * 12) + (ePawn - 1) + (!us * 6)]; //invert captured piece
+			//hash ^= z.piece_at[(move.to() * 12) + (ePawn - 1) + (!us * 6)]; //invert captured piece
 		} else {
 			hash ^= z.piece_at[(move.to() * 12) + (move.captured() - 1) + (us * 6)]; //invert captured piece
 		}

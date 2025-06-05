@@ -305,12 +305,14 @@ int Engine::alphaBeta(int alpha, int beta, int depthleft, bool is_pv) {
 }
 
 void Engine::sortMoves(std::vector<Move>& moves) {
+	if (moves.size() == 1) {
+		return;
+	}
 
     std::vector<std::pair<int, Move>> captures;
 	std::vector<std::pair<int, Move>> bad_captures;
 	std::vector<std::pair<int, Move>> history_moves;
 	std::vector<std::pair<int, Move>> fallback_moves;
-
 	int index = 0;
 
 	TTEntry entry = probeTT(b.getHash());
@@ -324,6 +326,7 @@ void Engine::sortMoves(std::vector<Move>& moves) {
 		auto pos_killer = std::find(moves.begin(), moves.end(), killer_moves[b.ply - start_ply][0]);
 		if (pos_killer != moves.end()) {
 			std::swap(*(moves.begin() + index), *pos_killer);
+
 			index++;
 		}
 	}
@@ -377,11 +380,8 @@ void Engine::printPV(int score)  {
 	std::vector<Move> pv = getPrincipalVariation();
 	//if (!pv.empty()) {
 	std::cout << "info score cp " << score << " depth " << max_depth
-	<< " nodes " << nodes
-	//<< " given_time " << (start_ply % 2 ? tc.btime : tc.wtime)
-	<< " nps " << static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC))
-	<< " hash_hits: " << hash_hits
-	<< " hash_miss: " << hash_miss;
+		<< " nodes " << nodes
+		<< " nps " << static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC));
 	std::cout << " pv ";
 
 	for (auto& move : pv) {
