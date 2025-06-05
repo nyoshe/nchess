@@ -137,7 +137,7 @@ public:
 
     std::vector<Move> getLastMoves(int n_moves) const;
 
-	u64 getHash();
+	u64 getHash() const;
 	bool is3fold();
 
     [[nodiscard]] u64 calcHash() const;

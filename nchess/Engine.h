@@ -96,14 +96,13 @@ public:
 	void setBoardUCI(std::istringstream& uci);
 
 	Move search(int depth);
-	void sortMoves(std::vector<Move>& moves);
 	std::vector<Move> getPrincipalVariation() const;
 
 	void printPV(int score) ;
 
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best);
 
-	TTEntry probeTT(u64 hash_key) {
+	TTEntry probeTT(u64 hash_key) const{
 		hash_key = hash_key & (1048576 - 1);
 		return tt[hash_key];
 	}
@@ -116,3 +115,65 @@ public:
 
 };
 
+enum class MoveStage {
+	ttMove,
+	captures,
+	evals
+};
+class MoveGen {
+	std::vector<Move> moves;
+	std::vector<std::pair<int, Move>> fallback_moves;
+	MoveStage stage = MoveStage::ttMove;
+	bool init = false;
+public:
+	MoveGen(std::vector<Move> _moves) {
+		moves = _moves;
+
+	}
+	Move getNext(Engine& e, Board& b) {
+		Move out;
+		TTEntry entry = e.probeTT(e.b.getHash());
+		if (stage == MoveStage::ttMove) {
+			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
+			if (pos_best != moves.end()) {
+				out = *pos_best;
+				moves.erase(pos_best);
+				stage = MoveStage::captures;
+				return out;
+			}
+		}
+		
+
+		if (stage == MoveStage::captures && moves.end() != std::find_if(moves.begin(), moves.end(), [](const auto& m) {return m.captured();})) {
+			auto mvv_lva = [](const auto& a, const auto& b) {
+				return piece_vals[a.captured()] * 10 - piece_vals[a.piece()] < piece_vals[b.captured()] * 10 - piece_vals[b.piece()];
+				};
+			auto pos_best = std::ranges::max_element(moves.begin(), moves.end(), mvv_lva);
+			out = *pos_best;
+			moves.erase(pos_best);
+			return out;
+		} else {
+			stage = MoveStage::evals;
+		}
+		
+		if (stage == MoveStage::evals && fallback_moves.empty() && !init) {
+			init = true;
+			for (auto& move : moves) {
+				b.doMove(move);
+				fallback_moves.emplace_back(-b.getEval(), move);
+				b.undoMove();
+			}
+			auto func = [](const auto& a, const auto& b) {
+				return a.first > b.first; // Sort descending by eval
+				};
+
+			std::ranges::sort(fallback_moves, func);
+		}
+		if (stage == MoveStage::evals && !fallback_moves.empty()) {
+			out = fallback_moves.front().second;
+			fallback_moves.erase(fallback_moves.begin());
+			return out;
+		}
+		return Move();
+	}
+};

@@ -1090,7 +1090,7 @@ std::vector<Move> Board::getLastMoves(int n_moves) const {
 	return last_moves;
 }
 
-u64 Board::getHash() {
+u64 Board::getHash() const {
 	return hash;
 }
 
