@@ -19,6 +19,17 @@ struct TTEntry {
 	u8 search_depth = 0;
 	TType type = TType::EXACT;
 	Move best_move;
+	TTEntry& operator=(const TTEntry& other) {
+		if (this != &other) {
+			eval = other.eval;
+			depth = other.depth;
+			ply = other.ply;
+			search_depth = other.search_depth;
+			type = other.type;
+			best_move = other.best_move;
+		}
+		return *this;
+	}
 };
 
 struct TimeControl {
@@ -42,7 +53,7 @@ private:
 	std::array<int, MAX_PLY> pv_length;
 	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
 	std::vector<Move> pv_moves;
-	std::vector<TTEntry*> tt;
+	std::vector<TTEntry> tt;
 
 	
 	// Engine state variables
@@ -69,6 +80,9 @@ public:
 	TimeControl tc;
 	Engine() {
 		tt.resize(1048576);
+		//for (auto& entry : tt) {
+		//	entry = TTEntry();
+		//}
 	}
 
 	std::vector<PerfT> doPerftSearch(int depth);
@@ -78,21 +92,16 @@ public:
 	void setBoardUCI(std::istringstream& uci);
 
 	Move search(int depth);
-	std::vector<std::pair<int, Move>> sortMoves(std::vector<Move>& moves);
+	void sortMoves(std::vector<Move>& moves);
 	std::vector<Move> getPrincipalVariation() const;
 
-	void printPV(Move root_move, int score) ;
+	void printPV(int score) ;
 
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best);
 
-	TTEntry* probeTT(u64 hash_key) {
+	TTEntry probeTT(u64 hash_key) {
 		hash_key = hash_key & (1048576 - 1);
-		if (tt[hash_key]) {
-			hash_hits++;
-			return tt[hash_key];
-		}
-		hash_miss++;
-		return nullptr;
+		return tt[hash_key];
 	}
 
 	bool checkTime();

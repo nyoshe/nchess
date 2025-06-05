@@ -482,6 +482,9 @@ void Board::loadUci(std::istringstream& iss) {
             Move move = moveFromUCI(tokens[idx]);
             if (move.raw() != 0) {
                 doMove(move);
+				if (calcHash() != hash) {
+					throw std::logic_error("hashing error");
+				}
             } else {
                 // Invalid move, stop processing further
                 break;
@@ -854,6 +857,7 @@ void Board::filterToLegal(std::vector<Move> &moves) {
 		doMove(move);
 		if (half_move > 100) {
 			moves.erase(moves.begin() + i);
+			undoMove();
 			continue;
 		}
 		us ^= 1;
@@ -872,13 +876,12 @@ void Board::filterToLegal(std::vector<Move> &moves) {
 }
 
 bool Board::isLegal(Move move)  {
-	std::vector<Move> moves;
-	genPseudoLegalMoves(moves);
-	filterToLegal(moves);
-	for (auto& legal_move : moves) {
-		if (legal_move == move) {
-			return true;
-		}
+	std::vector<Move> vmove = {move};
+	if (move.raw() == 0) return false;
+	
+	if (piece_board[move.from()] == move.piece() && piece_board[move.to()] == move.captured()) {
+		filterToLegal(vmove);
+		return !vmove.empty();
 	}
 	return false;
 }
@@ -1120,7 +1123,7 @@ u64 Board::calcHash() const {
 
 void Board::updateZobrist(Move move) {
 	u8 p = move.piece();
-	if (us) hash ^= z.side;
+	hash ^= z.side;
 	hash ^= z.piece_at[(move.from() * 12) + (move.piece() - 1) + (!us * 6)]; //invert from square hash
 
 	if (move.promotion() != eNone) {
@@ -1131,9 +1134,10 @@ void Board::updateZobrist(Move move) {
         
 	if (move.captured() != eNone) {
 		if (move.isEnPassant()) {
-			hash ^= z.piece_at[((state_stack.end() - 2)->move.to() * 12) + (ePawn - 1) + (us * 6)]; //add captured piece
+			hash ^= z.piece_at[((state_stack.end() - 2)->move.to() * 12) + (ePawn - 1) + (us * 6)]; //invert captured piece
+			hash ^= z.piece_at[(move.to() * 12) + (ePawn - 1) + (!us * 6)]; //invert captured piece
 		} else {
-			hash ^= z.piece_at[(move.to() * 12) + (move.captured() - 1) + (us * 6)]; //add captured piece
+			hash ^= z.piece_at[(move.to() * 12) + (move.captured() - 1) + (us * 6)]; //invert captured piece
 		}
 	}
 

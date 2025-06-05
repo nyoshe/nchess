@@ -76,16 +76,22 @@ public:
             }
             else if (token == "test")
             {
-                /*Warning; Illegal pv move f4g3 from new
-Info; info score cp -1360 depth 4 nodes 2625 nps 2625000 hash_hits: 3506560 hash_miss: 24943868 pv g4g3 f6g7 g3f4 g7g6 f4g3
-Position; fen r2qkb1r/1ppn1ppp/p3bn2/3p4/3P1B2/2NBPN2/PP3PPP/R2QK2R w KQkq - 4 9
-Moves; e1g1 f8b4 d1e2 e8g8 a1e1 b4c3 b2c3 f6e4 e2c2 c7c6 d3e4 d5e4 f3d2 f7f5 f2f3 e4f3 d2f3 d7f6 f3e5 a8c8 h2h3 c6c5 c2b1 b7b5 b1b2 f6e4 e1d1 d8d5 b2a3 d5a2 a3a2 e6a2 d4c5 a2b3 d1d7 g7g5 f4h2 c8c5 e5d3 c5d5 d7d5 b3d5 f1c1 g5g4 h3g4 f5g4 d3b4 d5a8 h2f4 a8b7 f4e5 g4g3 c3c4 f8d8 c4c5 e4c5 e5g3 d8d2 c1c2 d2c2 b4c2 b7e4 c2d4 b5b4 g3d6 b4b3 d4e2 b3b2 e2c3 c5a4 d6a3 a4c3 a3b2 c3b1 g1f2 a6a5 g2g3 a5a4 b2f6 a4a3 f2e1 a3a2 g3g4 g8f7 f6e5 b1a3 e1f2 a3c4 e5d4 h7h6 f2g3 c4e3 g3f4 e3c2 d4e5 e4c6 g4g5 h6g5 f4g5 a2a1q e5a1 c2a1 g5f4 a1c2 f4f5 c2d4 f5e5 d4f3 e5f5 c6d5 f5g4 f7f6 g4f4 f6g6 f4g4 f3e5 g4f4 e5f3 f4g4 g6f6*/
-                std::istringstream test("fen r2qkb1r/1ppn1ppp/p3bn2/3p4/3P1B2/2NBPN2/PP3PPP/R2QK2R w KQkq - 4 9 moves e1g1 f8b4 d1e2 e8g8 a1e1 b4c3 b2c3 f6e4 e2c2 c7c6 d3e4 d5e4 f3d2 f7f5 f2f3");
-                engine_.tc.winc = 100000000;
+                
+                /* Warning; Illegal pv move c1b1 from new
+Info; info score cp -1 depth 2 nodes 2538 nps 1269000 hash_hits: 1710388 hash_miss: 2082932 pv f6g6 c1b1 a5a4 
+Position; fen r1bqk2r/ppp2pp1/n3pn1p/3p4/1b1P1B2/2NQPN2/PPP2PPP/R3KB1R w KQkq - 0 7
+Moves; g2g3 e8g8 f1g2 c7c5 e1c1 c5c4 d3e2 b4c3 b2c3 f6e4 f3e5 e4c3 e2g4 g7g5 d1e1 g8h7 g4h3 g5f4 e5g4 d8g5 e3f4 g5g6 g4e5 g6f5 e5g4 f5g6 g4e5 g6f5 e5g4 h6h5 e1e5 c3e2 c1d2 e2f4 e5f5 f4h3 f5h5 h7g7 g2h3 g7g6 h5h4 a6b4 g4e5 g6g7 h1d1 f7f6 h4g4 g7h7 g4h4 h7g8 e5g6 f8f7 d1e1 f6f5 g6e5 f7c7 c2c3 b4c6 d2c1 c6e5 e1e5 c8d7 h3g2 a8d8 h4h5 c7c8 h5g5 g8f7 g2f3 f7f6 g5h5 f6g6 h2h4 a7a5 h5g5 g6f6 g5h5 f6g6 h5g5 g6f6 g5h5 
+            	*/
+
+                std::istringstream test("fen r1bqk2r/ppp2pp1/n3pn1p/3p4/1b1P1B2/2NQPN2/PPP2PPP/R3KB1R w KQkq - 0 7 moves g2g3 e8g8 f1g2 c7c5 e1c1 c5c4 d3e2 b4c3 b2c3 f6e4 f3e5 e4c3 e2g4 g7g5 d1e1 g8h7 g4h3 g5f4 e5g4 d8g5 e3f4 g5g6 g4e5 g6f5 e5g4 f5g6 g4e5 g6f5 e5g4 h6h5 e1e5 c3e2 c1d2 e2f4 e5f5 f4h3 f5h5 h7g7 g2h3 g7g6 h5h4 a6b4 g4e5 g6g7 h1d1 f7f6 h4g4 g7h7 g4h4 h7g8 e5g6 f8f7 d1e1 f6f5 g6e5 f7c7 c2c3 b4c6 d2c1 c6e5 e1e5 c8d7 h3g2 a8d8 h4h5 c7c8 h5g5 g8f7 g2f3 f7f6 g5h5 f6g6 h2h4 a7a5 h5g5 g6f6 g5h5 f6g6 h5g5 g6f6 g5h5 ");
+                
+				
+                //std::istringstream test("fen rn1qkb1r/ppp1ppp1/7p/3p4/6bB/2P2N2/PPP1QPPP/R3KB1R b KQkq - 1 7 moves b8c6 e1c1 a8c8 c1b1 g7g5 h4g3 f8g7 h2h3 g4h5 h3h4 e7e5 h4g5 h6g5 h1h5 h8h5 f3e5 g7e5 e2h5 e5g3 f2g3 d8f6 f1b5 f6e5 d1f1 e5e7 h5h1 e8d7 h1h3 d7d8 h3f5 e7e6 f5f7 e6f7 f1f7 a7a6 b5c6 b7c6 f7g7 d8e8 a2a3 e8f8 g7g5 c8e8 g5f5 f8g7 f5g5 g7f6 g5g4 e8e1 b1a2 a6a5 g4f4 f6g7 f4g4 g7h7 g4f4 h7g7 c3c4 e1e2 c4d5 c6d5 c2c4 c7c6 c4d5 c6d5 f4f5 e2d2 a3a4 d2d3 g3g4 d3d4 a2b1 d4a4 f5d5 a4g4 d5a5 g4g2 a5a7 g7g6 a7d7 g2e2 b1c1 e2e4 c1b1 g6f5 d7f7 f5g4 f7g7 g4f3 g7f7 f3g4 b1c2 e4e2 c2c3 g4g3 b2b4 e2e1 b4b5 e1b1 c3c4 b1b2 c4c5 b2c2 c5b6 c2b2 f7d7 b2b1 d7g7 g3f3 g7f7 f3g3 f7g7 g3f3 b6c6 b1b2 b5b6 b2c2 c6d5 c2d2 d5c4 d2c2 c4d3 c2a2 b6b7 a2b2 g7f7 f3g3 d3c3 b2b5 f7g7 g3f4 g7c7 f4f3 ");
+            	engine_.tc.winc = 100000000;
                 engine_.tc.binc = 100000000;
             	setupBoard(test);
-                engine_.b.printBoard();
-                std::cout << engine_.b.boardString();
+                //engine_.b.printBoard();
+                //std::cout << engine_.b.boardString();
                 std::istringstream go_stream("go movetime 10000000");
                 handleGo(go_stream);
             }
