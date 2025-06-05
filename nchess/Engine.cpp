@@ -395,7 +395,7 @@ void Engine::printPV(int score)  {
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best) {
 	hash_key = hash_key & (1048576 - 1);
 
-	if (tt[hash_key].ply < start_ply ||  tt[hash_key].depth <= depth_left) { //replace
+	if (tt[hash_key].ply <= start_ply ||  tt[hash_key].depth <= depth_left) { //replace
 		tt[hash_key] = TTEntry{ score, u8(depth_left), u16(start_ply), u8(max_depth), type, best };
 		/*
 		tt[hash_key]->type = type;
