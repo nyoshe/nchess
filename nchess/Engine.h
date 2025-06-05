@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "robin_hood.h"
 enum class TType : u8 {
+	INVALID,
 	EXACT,
 	ALPHA,
 	BETA,
@@ -14,21 +15,24 @@ enum class TType : u8 {
 
 struct TTEntry {
 	int eval = 0;
-	u8 depth = 0;
+	u8 depth_left = 0;
 	u16 ply = 0;
 	u8 search_depth = 0;
-	TType type = TType::EXACT;
+	TType type = TType::INVALID;
 	Move best_move;
 	TTEntry& operator=(const TTEntry& other) {
 		if (this != &other) {
 			eval = other.eval;
-			depth = other.depth;
+			depth_left = other.depth_left;
 			ply = other.ply;
 			search_depth = other.search_depth;
 			type = other.type;
 			best_move = other.best_move;
 		}
 		return *this;
+	}
+	[[nodiscard]] explicit constexpr operator bool() const {
+		return type != TType::INVALID;
 	}
 };
 
@@ -73,7 +77,7 @@ private:
 
 
 	void perftSearch(int depth);
-	int alphaBeta(int alpha, int beta, int depthleft, bool is_pv);
+	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta);
 public:
 	Board b;

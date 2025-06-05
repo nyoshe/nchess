@@ -77,10 +77,10 @@ public:
             else if (token == "test")
             {
                 
-                /* Warning; Illegal pv move e4f5 from new
-Info; info score cp 2270 depth 6 nodes 266250 nps 4512711 pv h5h4 e4f5 e6f7 f5e5 h4h3 e5d5 h3h2
-Position; fen rnb1kb1r/ppq2ppp/2p1pn2/3p4/3P4/1P2PN2/PBP1BPPP/RN1Q1RK1 w kq - 0 8
-Moves; c2c4 f8e7 b1c3 e8g8 a1c1 h7h6 h2h3 a7a6 e2d3 f8d8 f1e1 d5c4 d3c4 c6c5 c4d3 b8c6 c3e4 b7b6 d3b1 f6e4 b1e4 c8b7 d1e2 a8c8 a2a4 e7f8 b2c3 f8d6 e2b2 c6b4 e4b7 b4d3 b7c8 d3b2 c8a6 c5d4 c3b2 c7a7 a6d3 d4e3 f2e3 a7a5 e1d1 d6c5 f3d4 d8b8 d3e4 b8d8 b2c3 a5a7 d4c2 d8d1 c1d1 a7c7 c3b4 f7f5 e4f3 c5b4 c2b4 c7c5 d1d4 c5c3 d4d8 g8h7 b4d3 c3b3 d8d6 b3a3 d6d8 a3a4 g1h2 a4a7 d8a8 a7c7 h2h1 c7d6 d3b2 d6d2 b2d1 e6e5 a8a7 e5e4 f3h5 h7h8 a7a8 h8h7 a8a7 d2d5 a7e7 f5f4 h5g4 h6h5 e7d7 d5a5 g4e6 a5e1 h1h2 e1g3 h2h1 f4f3 g2f3 e4f3 e6f5 h7h6 d7d2 g3e1 h1h2 e1d2 h2g3 h6g5 d1f2 d2e3 f2e4 g5f5 e4d6 f5e6 d6e8 e6d7 e8g7 e3g5 g3f3 g5g7 f3f4 d7e6 h3h4 g7g4 f4e3 g4h4 e3d3 h4f2 d3e4
+                /* Warning; Illegal pv move c2e4 from new
+Info; info score cp -27 depth 4 nodes 72873 nps 1401403 pv h6g7 c2e4 b7e4 g3e4 c5d4
+Position; fen r2qk1nr/pbpn2bp/1p1ppp2/6p1/3PP3/3B1NB1/PPPN1PPP/R2QK2R w KQkq - 4 9
+Moves; d3c4 d6d5 c4d3 g8e7 e1g1 e8g8 c2c4 d5e4 d2e4 e7f5 d3c2 f5g3 e4g3 c7c5 g3h5 g7h6 h5g3 h6g7 g3h5 g7h6 h5g3
             	*/
 
                 std::istringstream test("fen r1bqkbnr/ppp1pppp/3p4/3Pn3/4P3/8/PPP2PPP/RNBQKBNR w KQkq - 1 4 moves f2f4 c8g4 f1e2 g4e2 g1e2 e5g6 e2d4 c7c5 d5c6");

@@ -78,4 +78,8 @@ public:
 	[[nodiscard]] constexpr bool operator==(const Move& other) const {
 		return data == other.data;
 	}
+
+	[[nodiscard]] explicit constexpr operator bool() const {
+		return data != 0;
+	}
 };
