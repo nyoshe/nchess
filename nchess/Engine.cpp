@@ -68,8 +68,7 @@ Move Engine::search(int depth) {
 	}
 
 	max_depth = 1;
-	int score = 0;
-
+	int score = alphaBeta(-100000, 100000, max_depth, false);
 
 	for (max_depth = 1; max_depth < MAX_PLY; max_depth++) {
 
@@ -80,7 +79,7 @@ Move Engine::search(int depth) {
 
 		// Keep searching until we get a score within our window
 		while (true) {
-			score = alphaBeta(alpha, beta, max_depth, true);
+			score = alphaBeta(alpha, beta, max_depth, false);
 			if (checkTime()) break;
 			if (score > alpha && score < beta) break;
 			if (score <= alpha) {
@@ -327,6 +326,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	while (move.raw()) {
 		moves_inspected++;
 		int score = 0;
+
 		bool can_reduce =
 			i >= 3 &&   
 			!move.captured() &&
@@ -348,7 +348,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			i++;
 			continue;
 		}
-
+		
 		if (can_reduce) {
 			int R = int(0.5 + std::log(depth_left) * std::log(i) / 3.0);
 			score = -alphaBeta(-alpha - 1, -alpha, depth_left - 1 - R, false);
@@ -503,9 +503,10 @@ void Engine::updatePV(int depth, Move move) {
 
 int Engine::quiesce(int alpha, int beta) {
 	nodes++;
-
+	
 	if (checkTime()) return -100000;
 	if (b.is3fold()) return 0;
+	int search_ply = b.ply - start_ply;
 	/*
 	TTEntry* entry = probeTT(b.getHash());
 
@@ -528,22 +529,22 @@ int Engine::quiesce(int alpha, int beta) {
 		alpha = stand_pat;
 	}
 
-	StaticVector<Move> captures;
-	b.genPseudoLegalCaptures(captures);
-	b.filterToLegal(captures);
+	g_move_list[search_ply].clear();
+	b.genPseudoLegalCaptures(g_move_list[search_ply]);
+	b.filterToLegal(g_move_list[search_ply]);
 	MoveGen move_gen;
 
 	// Check for #M
-	if (!captures.size() && b.isCheck()) {
-		b.genPseudoLegalMoves(captures);
-		b.filterToLegal(captures);
-		if (!captures.size()) {
+	if (!g_move_list[search_ply].size() && b.isCheck()) {
+		b.genPseudoLegalMoves(g_move_list[search_ply]);
+		b.filterToLegal(g_move_list[search_ply]);
+		if (!g_move_list[search_ply].size()) {
 			return -99999 + b.ply - start_ply;
 		}
 	}
 	Move best_move;
 
-	Move move = move_gen.getNext(*this, b, captures);
+	Move move = move_gen.getNext(*this, b, g_move_list[search_ply]);
 	search_calls++;
 	while (move.raw()) {
 
@@ -562,7 +563,7 @@ int Engine::quiesce(int alpha, int beta) {
 		if (score > alpha) {
 			alpha = score;
 		}
-		move = move_gen.getNext(*this, b, captures);
+		move = move_gen.getNext(*this, b, g_move_list[search_ply]);
 	}
 	if (best <= alpha) return alpha; 
 	return best;

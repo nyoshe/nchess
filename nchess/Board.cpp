@@ -1155,10 +1155,12 @@ void Board::filterToLegal(StaticVector<Move>& moves) {
 				continue;
 			}
 		}
-
+		if (half_move > 100) {
+			continue;
+		}
 
 		doMove(move);
-		if (half_move > 100 || is3fold()) {
+		if (is3fold()) {
 			undoMove();
 			continue;
 		}
