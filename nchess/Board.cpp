@@ -44,6 +44,7 @@ void Board::setOccupancy() {
 }
 
 void Board::doMove(Move move) {
+
 	state_stack.emplace_back(ep_square, castle_flags, move, eval, hash, half_move);
 	//null move
 	if (move.from() == move.to()) {
@@ -1154,12 +1155,16 @@ void Board::filterToLegal(StaticVector<Move>& moves) {
 				continue;
 			}
 		}
-		
+
 
 		doMove(move);
 		if (half_move > 100 || is3fold()) {
 			undoMove();
 			continue;
+		}
+		if (move.toUci() == "d2h7") {
+			printBoard();
+			printBitBoards();
 		}
 		us ^= 1;
 		bool inCheck = isCheck();

@@ -311,7 +311,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 		futility_prune = (futility_margin <= alpha);
 	}
 
-	
+	g_move_list[search_ply].clear();
 	b.genPseudoLegalMoves(g_move_list[search_ply]);
 	b.filterToLegal(g_move_list[search_ply]);
 	MoveGen movegen;
@@ -546,12 +546,7 @@ int Engine::quiesce(int alpha, int beta) {
 	Move move = move_gen.getNext(*this, b, captures);
 	search_calls++;
 	while (move.raw()) {
-		b.printBoard();
-		b.printBitBoards();
-		std::cout << move.toUci() << "\n";
-		if (move.toUci() == "c2h7") {
-			std::cout << "wa";
-		}
+
 		if (move.captured() == eKing) return 99999 - (b.ply - start_ply);
 
 
