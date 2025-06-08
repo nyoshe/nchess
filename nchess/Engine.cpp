@@ -5,7 +5,7 @@
 void Engine::perftSearch(int d) {
 
 	if (!d) return;
-	std::vector<Move> legal_moves;
+	StaticVector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
 
@@ -42,13 +42,6 @@ void Engine::perftSearch(int d) {
 }
 /**/
 Move Engine::search(int depth) {
-	for (auto& i : history_table) {
-		for (auto& j : i) {
-			for (auto& k : j) {
-				k = 0;
-			}
-		}
-	}
 	for (auto& i : pv_table) {
 		for (auto& j : i) {
 			j = Move();
@@ -63,12 +56,10 @@ Move Engine::search(int depth) {
 	start_time = std::clock();
 	start_ply = b.ply;
 
-
-
-	std::vector<Move> legal_moves;
+	StaticVector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
-	sortMoves(legal_moves);
+
 	calcTime();
 	Move best_move = legal_moves.front();
 	std::vector<std::pair<int, Move>> sorted_moves;
@@ -80,7 +71,7 @@ Move Engine::search(int depth) {
 	int score = 0;
 
 
-	for (max_depth = 1; max_depth < 20; max_depth++) {
+	for (max_depth = 1; max_depth < MAX_PLY; max_depth++) {
 
 		// Start with narrow aspiration window
 		int alpha = score - 50;
@@ -147,6 +138,7 @@ Move Engine::search(int depth) {
 	if (best_move.from() == 0 && best_move.to() == 0) {
 		best_move = pv_table[0][0];
 	}
+
 	return best_move;
 }
 /*
@@ -283,16 +275,15 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	if (depth_left <= 0) return quiesce(alpha, beta);
 	
 	//check first for hash hits
-	/*
+	/**/
 	u64 hash_key = b.getHash();
 	TTEntry entry = probeTT(hash_key);
 	
 	if (entry && entry.search_depth >= max_depth && entry.depth_left >= depth_left) {
-		if (entry.type == TType::EXACT) return entry.eval;
 		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
 		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
 	}
-	*/
+	
 	
 	int best = -100000;
 	Move best_move;
@@ -320,19 +311,18 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 		futility_prune = (futility_margin <= alpha);
 	}
 
-	std::vector<Move> legal_moves;
-	legal_moves.reserve(128);
-	b.genPseudoLegalMoves(legal_moves);
-	b.filterToLegal(legal_moves);
-	MoveGen movegen(legal_moves);
+	
+	b.genPseudoLegalMoves(g_move_list[search_ply]);
+	b.filterToLegal(g_move_list[search_ply]);
+	MoveGen movegen;
 	// Check for mate/stalemate
-	if (legal_moves.empty()) {
+	if (g_move_list[search_ply].empty()) {
 		return in_check ? -99999 + search_ply : 0;
 	}
 	
 	//sortMoves(legal_moves);
 	int i = 0;
-	Move move = movegen.getNext(*this, b);
+	Move move = movegen.getNext(*this, b, g_move_list[search_ply]);
 	search_calls++;
 	while (move.raw()) {
 		moves_inspected++;
@@ -354,7 +344,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			!move.isEnPassant() &&
 			!in_check) {
 			b.undoMove();
-			move = movegen.getNext(*this, b);
+			move = movegen.getNext(*this, b, g_move_list[search_ply]);
 			i++;
 			continue;
 		}
@@ -405,7 +395,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			storeTTEntry(b.getHash(), beta, TType::BETA , depth_left, best_move);
 			return beta;
 		}
-		move = movegen.getNext(*this, b);
+		move = movegen.getNext(*this, b, g_move_list[search_ply]);
 	}
 	if (best <= alpha) {
 		// fail-low node - none of the moves improved alpha
@@ -422,8 +412,10 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 
 std::vector<Move> Engine::getPrincipalVariation() const {
 	std::vector<Move> pv;
-	for (int i = 0; i < pv_length[0]; i++) {
-		pv.push_back(pv_table[0][i]);
+	if (pv_length[0]) {
+		for (int i = 0; i < pv_length[0]; i++) {
+			pv.push_back(pv_table[0][i]);
+		}
 	}
 	return pv;
 }
@@ -442,6 +434,24 @@ void Engine::printPV(int score)  {
 	std::cout << std::endl;
 	//}
 	
+}
+
+std::string Engine::getPV() {
+		
+	std::vector<Move> pv = getPrincipalVariation();
+	if (!pv.empty()) {
+		std::string out = "depth " + std::to_string(max_depth)
+			+ " nodes " + std::to_string(nodes)
+			+ " nps " + std::to_string(static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC)))
+			+ " pv ";
+
+		for (auto& move : pv) {
+			out += move.toUci() + " ";
+		}
+		return out;
+	}
+	return "";
+	//}
 }
 
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best) {
@@ -464,7 +474,7 @@ void Engine::calcTime() {
 		max_time = tc.movetime;
 		return;
 	}
-	std::vector<Move> legal_moves;
+	StaticVector<Move> legal_moves;
 	b.genPseudoLegalMoves(legal_moves);
 	b.filterToLegal(legal_moves);
 
@@ -518,11 +528,10 @@ int Engine::quiesce(int alpha, int beta) {
 		alpha = stand_pat;
 	}
 
-	std::vector<Move> captures;
-	captures.reserve(32);
+	StaticVector<Move> captures;
 	b.genPseudoLegalCaptures(captures);
 	b.filterToLegal(captures);
-	sortMoves(captures);
+	MoveGen move_gen;
 
 	// Check for #M
 	if (!captures.size() && b.isCheck()) {
@@ -534,7 +543,15 @@ int Engine::quiesce(int alpha, int beta) {
 	}
 	Move best_move;
 
-	for (auto& move : captures) {
+	Move move = move_gen.getNext(*this, b, captures);
+	search_calls++;
+	while (move.raw()) {
+		b.printBoard();
+		b.printBitBoards();
+		std::cout << move.toUci() << "\n";
+		if (move.toUci() == "c2h7") {
+			std::cout << "wa";
+		}
 		if (move.captured() == eKing) return 99999 - (b.ply - start_ply);
 
 
@@ -550,6 +567,7 @@ int Engine::quiesce(int alpha, int beta) {
 		if (score > alpha) {
 			alpha = score;
 		}
+		move = move_gen.getNext(*this, b, captures);
 	}
 	if (best <= alpha) return alpha; 
 	return best;

@@ -4,7 +4,12 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_map>
+#include <stack>
 #include "robin_hood.h"
+#include "Memory.h"
+#include "Movegen.h"
+
+
 enum class TType : u8 {
 	INVALID,
 	EXACT,
@@ -44,21 +49,24 @@ struct TimeControl {
 	int movetime = 0;
 };
 
+#define MAX_PLY 64
+
+
 class Engine
 {
 private:
 	int hash_hits;
 	int hash_miss;
 	//Move best_move;
-	static constexpr int MAX_PLY = 64;
+	
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
-	std::array<int, MAX_PLY> pv_length;
+	std::array<int, MAX_PLY> pv_length{};
 	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
 	std::vector<Move> pv_moves;
 	std::vector<TTEntry> tt;
-
+	std::array<StaticVector<Move>, MAX_PLY> g_move_list;
 	
 	// Engine state variables
 	int start_ply = 0;
@@ -76,6 +84,7 @@ private:
 	int pos_count = 0;
 
 
+
 	void perftSearch(int depth);
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta);
@@ -84,9 +93,7 @@ public:
 	TimeControl tc;
 	Engine() {
 		tt.resize(1048576);
-		//for (auto& entry : tt) {
-		//	entry = TTEntry();
-		//}
+		
 	}
 
 	std::vector<PerfT> doPerftSearch(int depth);
@@ -98,7 +105,9 @@ public:
 	Move search(int depth);
 	std::vector<Move> getPrincipalVariation() const;
 
-	void printPV(int score) ;
+	void printPV(int score);
+
+	std::string getPV();
 
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best);
 
@@ -120,42 +129,43 @@ enum class MoveStage {
 	captures,
 	evals
 };
+
 class MoveGen {
-	std::vector<Move> moves;
+	int move_len;
 	std::vector<std::pair<int, Move>> fallback_moves;
 	MoveStage stage = MoveStage::ttMove;
 	bool init = false;
 public:
-	MoveGen(std::vector<Move> _moves) {
-		moves = _moves;
-
-	}
-	Move getNext(Engine& e, Board& b) {
+	MoveGen() = default;
+	Move getNext(Engine& e, Board& b, StaticVector<Move>& moves) {
+		if (moves.empty()) return Move();
 		Move out;
 		TTEntry entry = e.probeTT(e.b.getHash());
 		if (stage == MoveStage::ttMove) {
 			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
 			if (pos_best != moves.end()) {
 				out = *pos_best;
-				moves.erase(pos_best);
+				*pos_best = moves.pop_back();
 				stage = MoveStage::captures;
 				return out;
 			}
+			stage = MoveStage::captures;
 		}
-		
+
 
 		if (stage == MoveStage::captures && moves.end() != std::find_if(moves.begin(), moves.end(), [](const auto& m) {return m.captured();})) {
 			auto mvv_lva = [](const auto& a, const auto& b) {
 				return piece_vals[a.captured()] * 10 - piece_vals[a.piece()] < piece_vals[b.captured()] * 10 - piece_vals[b.piece()];
 				};
-			auto pos_best = std::ranges::max_element(moves.begin(), moves.end(), mvv_lva);
+			auto pos_best = std::max_element(moves.begin(), moves.end(), mvv_lva);
 			out = *pos_best;
-			moves.erase(pos_best);
+			*pos_best = moves.pop_back();
 			return out;
-		} else {
+		}
+		else {
 			stage = MoveStage::evals;
 		}
-		
+
 		if (stage == MoveStage::evals && fallback_moves.empty() && !init) {
 			init = true;
 			for (auto& move : moves) {
@@ -176,4 +186,6 @@ public:
 		}
 		return Move();
 	}
+
 };
+

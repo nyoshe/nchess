@@ -2,6 +2,7 @@
 #include "../nchess/Board.h"
 #include "../nchess/Engine.h"
 #include "../nchess/pgn.h"
+#include  "../nchess/Memory.h"
 #include <filesystem>
 #include <map>
 // Test board initializes to standard chess position
@@ -69,7 +70,8 @@ TEST(BoardTest, InitializesToStartingPosition) {
 // Test making and undoing a move
 TEST(BoardTest, MakeAndUndoMove) {
     Board board;
-    std::vector<Move> moves;
+    StaticVector<Move> moves;
+
     board.genPseudoLegalMoves(moves);
     board.filterToLegal(moves);
     // Find e2e4
@@ -108,7 +110,8 @@ TEST(BoardTest, CastlingMoves) {
         board.removePiece(sq);
     }
     // King-side castling
-    std::vector<Move> moves;
+    StaticVector<Move> moves;
+
     board.genPseudoLegalMoves(moves);
     board.filterToLegal(moves);
     bool found_kingside = false, found_queenside = false;

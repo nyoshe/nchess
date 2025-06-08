@@ -4,7 +4,7 @@
 #include <string>
 #include "Misc.h"
 
-class Move
+class Move 
 {
 private:
 	uint32_t data = 0;

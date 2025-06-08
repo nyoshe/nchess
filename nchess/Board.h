@@ -2,6 +2,7 @@
 #include "Misc.h"
 #include "BitBoard.h"
 #include "Move.h"
+#include "Memory.h"
 #include "Tables.h"
 #include <iostream>
 #include <iomanip>
@@ -39,6 +40,8 @@ struct BoardState {
     auto operator<=>(const BoardState&) const = default;
 };
 
+
+
 struct Zobrist {
     std::array<u64, 12 * 64> piece_at;
     u64 side;
@@ -64,7 +67,7 @@ private:
 
         return z;
     }
-
+    
     Zobrist z = initZobristValues();
     std::array<u8, 64> piece_board;
     int16_t eval = 0;
@@ -79,7 +82,7 @@ public:
 	Board();
     // Copy constructor
     Board(const Board& other) = default;
-
+    	int moveGen(Move* move_list);
 	// Equality operator
     bool operator==(const Board& other) const;
 
@@ -104,11 +107,15 @@ public:
     std::string sanFromMove(Move move);
     Move moveFromUCI(const std::string& uci);
     void loadUci(std::istringstream& uci);
-	void genPseudoLegalCaptures(std::vector<Move>& moves);
-    void serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet);
 
-	void genPseudoLegalMoves(std::vector<Move>& moves);
-    void filterToLegal(std::vector<Move>& pseudo_moves);
+
+	void genPseudoLegalCaptures(StaticVector<Move>& moves);
+
+    void serializeMoves(Piece piece, StaticVector<Move>& moves, bool quiet);
+
+	void genPseudoLegalMoves(StaticVector<Move>& moves);
+
+    void filterToLegal(StaticVector<Move>& moves);
     bool isLegal(Move move) ;
 
 
@@ -146,4 +153,7 @@ public:
 
 	int getMobility(bool side) const;
 };
+
+
+
 

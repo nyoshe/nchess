@@ -6,6 +6,7 @@ typedef unsigned long long u64;
 typedef uint16_t u16;
 typedef uint8_t u8;
 typedef int8_t i8;
+using usize = std::size_t;
 
 enum Piece : u8 {
 	eNone, ePawn, eKnight, eBishop, eRook, eQueen, eKing

@@ -66,6 +66,7 @@ void Board::doMove(Move move) {
 	} else {
 		half_move++;
 	}
+	
 	movePiece(move.from(), move.to());
 
 	u8 p = move.piece();
@@ -452,11 +453,12 @@ void Board::loadFen(std::istringstream& fen_stream) {
 }
 
 Move Board::moveFromUCI(const std::string& uci) {
-	std::vector<Move> moves;
-	genPseudoLegalMoves(moves);
-	filterToLegal(moves);
+	StaticVector<Move> board_moves;
 
-	for (const auto& move : moves) {
+	genPseudoLegalMoves(board_moves);
+	filterToLegal(board_moves);
+
+	for (const auto& move : board_moves) {
 		if (move.toUci() == uci) {
 			return move;
 		}
@@ -496,7 +498,8 @@ void Board::loadUci(std::istringstream& iss) {
 Move Board::moveFromSan(const std::string& san) {
 	std::string move = san;
 
-	std::vector<Move> moves;
+	StaticVector<Move> moves;
+
 	genPseudoLegalMoves(moves);
 	filterToLegal(moves);
 	// Remove check/mate symbols
@@ -633,9 +636,8 @@ std::string Board::sanFromMove(Move move) {
 	}
 
 	// Handle disambiguation
-	std::vector<Move> moves;
+	StaticVector<Move> moves;
 	genPseudoLegalMoves(moves);
-	
 	filterToLegal(moves);
 	bool fileAmbiguity = false, rankAmbiguity = false;
 	for (const auto& m : moves) {
@@ -677,211 +679,16 @@ std::string Board::sanFromMove(Move move) {
 	return san;
 }
 
-void Board::genPseudoLegalMoves(std::vector<Move>& moves) {
-	const int them = us ^ 1;
-
-	u64 our_occ = boards[us][0];
-	u64 their_occ = boards[them][0];
-	u64 all_occ = our_occ | their_occ;
-
-	// PAWNS
-	u64 pawns = boards[us][ePawn];
-	int forward = (us == eWhite) ? 8 : -8;
-	int promo_rank = (us == eWhite) ? 6 : 1;
-
-	// Single pushes
-	u64 single_push = (us == eWhite) ? (pawns << 8) : (pawns >> 8);
-	single_push &= ~all_occ;
-
-	u64 attacks = single_push;
-
-	genPseudoLegalCaptures(moves);
-
-	while (attacks) {
-		unsigned long to;
-		BB::bitscan_reset(to, attacks);
-		int from = to - forward;
-		if ((from >> 3) == promo_rank) {
-			// Promotions
-			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, eNone, promo);
-		}
-		else {
-			moves.emplace_back(from, to, ePawn);
-		}
-	}
-
-	// Double pushes
-	u64 double_push = (us == eWhite ? (single_push << 8) : (single_push >> 8)) & ~all_occ;
-	attacks = double_push;
-	while (attacks) {
-		unsigned long to;
-		BB::bitscan_reset(to, attacks);
-		int from = to + (us == eWhite ? -16 : 16);
-		if ((us == eWhite && (from >> 3 == 1)) || (us == eBlack && (from >> 3) == 6)) {
-			moves.emplace_back(from, to, ePawn);
-		}
-	}
-
-	serializeMoves(eKnight, moves, true);
-	serializeMoves(eBishop, moves, true);
-	serializeMoves(eRook, moves, true);
-	serializeMoves(eQueen, moves, true);
-	serializeMoves(eKing, moves, true);
-
-	// --- Castling logic ---
-	// King and rook must be on their original squares, and squares between must be empty
-	// e1 = 4, h1 = 7, a1 = 0 (White)
-	// e8 = 60, h8 = 63, a8 = 56 (Black)
-	if (!isCheck()) {
-		if (us == eWhite) {
-			if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back(e1, g1, eKing);
-			if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back(e1, c1, eKing);
-		}
-		else {
-			if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back(
-				e8, g8, eKing);
-			if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back(
-				e8, c8, eKing);
-		}
-	}
-}
-
-void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
-	const int them = us ^ 1;
-	u64 our_occ = boards[us][0];
-	u64 their_occ = boards[them][0];
-	u64 all_occ = our_occ | their_occ;
-
-	// PAWNS
-	u64 pawns = boards[us][ePawn];
-	int promo_rank = (us == eWhite) ? 6 : 1;
-
-	// Single pushes
-	u64 single_push = (us == eWhite) ? (pawns << 8) : (pawns >> 8);
-	single_push &= ~all_occ;
-
-	// Pawn captures
-	
-	u64 left_captures = BB::get_pawn_attacks(eWest, Side(us), pawns, their_occ);
-	u64 right_captures = BB::get_pawn_attacks(eEast, Side(us), pawns, their_occ);
-	
-
-	while (left_captures) {
-		unsigned long to;
-		BB::bitscan_reset(to, left_captures);
-		int from = to - ((us == eWhite) ? 7 : -9);
-		if ((from >> 3) == promo_rank) {
-			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, piece_board[to], promo);
-		}
-		else {
-			moves.emplace_back(from, to, ePawn, piece_board[to]);
-		}
-	}
-	while (right_captures) {
-		unsigned long to;
-		BB::bitscan_reset(to, right_captures);
-		int from = to - ((us == eWhite) ? 9 : -7);
-		if ((from >> 3) == promo_rank) {
-			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, piece_board[to], promo);
-		}
-		else {
-			moves.emplace_back(from, to, ePawn, piece_board[to]);
-		}
-	}
-
-
-	if (ep_square != -1) {
-		int ep_from = ep_square + (us == eWhite ? -8 : 8);
-		// Left capture
-		if ((ep_square & 7) > 0 && (pawns & BB::set_bit(ep_from - 1))) {
-			moves.emplace_back(ep_from - 1, ep_square, ePawn, ePawn, eNone, true);
-		}
-		// Right capture
-		if ((ep_square & 7) < 7 && (pawns & BB::set_bit(ep_from + 1))) {
-			moves.emplace_back(ep_from + 1, ep_square, ePawn, ePawn, eNone, true);
-		}
-	}
-
-	serializeMoves(eKnight, moves, false);
-	serializeMoves(eBishop, moves, false);
-	serializeMoves(eRook, moves, false);
-	serializeMoves(eQueen, moves, false);
-	serializeMoves(eKing, moves, false);
-	
-}
-
-void Board::serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet){
-
-	u64 all_occ = boards[eBlack][0] | boards[eWhite][0];
-	u64 our_occ = boards[us][0];
-	u64 attackers = boards[us][piece];
-	u64 mask = quiet ? ~all_occ : all_occ;
-	unsigned long from;
-	while (attackers) {
-		BB::bitscan_reset(from, attackers);
-		u64 targets = 0;
-		switch (piece) {
-			case eKnight: targets = BB::knight_attacks[from] & ~our_occ & mask; break;
-			case eBishop: targets = BB::get_bishop_attacks(from, all_occ) & ~our_occ & mask; break;
-			case eRook: targets = BB::get_rook_attacks(from, all_occ) & ~our_occ & mask; break;
-			case eQueen: targets = BB::get_queen_attacks(from, all_occ) & ~our_occ & mask; break;
-			case eKing: targets = BB::king_attacks[from] & ~our_occ & mask; break;
-		}
-		unsigned long to;
-		while (targets) {
-			BB::bitscan_reset(to, targets);
-			moves.emplace_back(from, to, piece, piece_board[to]);
-		}
-	}
-}
-
-void Board::filterToLegal(std::vector<Move> &moves) {
-	//could be made quicker, perhaps only checking pieces between king and attackers
-	bool current_check = isCheck();
-	for (int i = 0; i < moves.size();) {
-		Move move = moves[i];
-		if (move.isCastle()) {
-			if (getAttackers((move.to() + move.from()) / 2, us)) {
-				moves.erase(moves.begin() + i);
-				continue;
-			}
-		}
-		if (is3fold()) {
-			moves.erase(moves.begin() + i);
-			continue;
-		}
-
-		doMove(move);
-		if (half_move > 100) {
-			moves.erase(moves.begin() + i);
-			undoMove();
-			continue;
-		}
-		us ^= 1;
-		bool inCheck = isCheck();
-		us ^= 1;
-		undoMove();
-
-		if (!inCheck) {
-			++i;
-			continue;
-		} else {
-			moves.erase(moves.begin() + i);
-		}
-	}
-
-}
 
 bool Board::isLegal(Move move)  {
-	std::vector<Move> vmove = {move};
+
+	StaticVector<Move> test_move;
+	test_move.emplace_back(move);
 	if (move.raw() == 0) return false;
 	
 	if (piece_board[move.from()] == move.piece() && piece_board[move.to()] == move.captured()) {
-		filterToLegal(vmove);
-		return !vmove.empty();
+		filterToLegal(test_move);
+		return !test_move.empty();
 	}
 	return false;
 }
@@ -1198,5 +1005,198 @@ int Board::getMobility(bool side) const {
 		}
 	}
 	return mobility;
+}
+
+void Board::genPseudoLegalMoves(StaticVector<Move>& moves) {
+	const int them = us ^ 1;
+
+	u64 our_occ = boards[us][0];
+	u64 their_occ = boards[them][0];
+	u64 all_occ = our_occ | their_occ;
+
+	// PAWNS
+	u64 pawns = boards[us][ePawn];
+	int forward = (us == eWhite) ? 8 : -8;
+	int promo_rank = (us == eWhite) ? 6 : 1;
+
+	// Single pushes
+	u64 single_push = (us == eWhite) ? (pawns << 8) : (pawns >> 8);
+	single_push &= ~all_occ;
+
+	u64 attacks = single_push;
+
+	genPseudoLegalCaptures(moves);
+
+	while (attacks) {
+		unsigned long to;
+		BB::bitscan_reset(to, attacks);
+		u8 from = to - forward;
+		if ((from >> 3) == promo_rank) {
+			// Promotions
+			for (int promo = eKnight; promo <= eQueen; ++promo)
+				moves.emplace_back({ from, u8(to), ePawn, eNone, u8(promo) });
+		}
+		else {
+			moves.emplace_back({ from, u8(to), ePawn });
+		}
+	}
+
+	// Double pushes
+	u64 double_push = (us == eWhite ? (single_push << 8) : (single_push >> 8)) & ~all_occ;
+	attacks = double_push;
+	while (attacks) {
+		unsigned long to;
+		BB::bitscan_reset(to, attacks);
+		u8 from = to + (us == eWhite ? -16 : 16);
+		if ((us == eWhite && (from >> 3 == 1)) || (us == eBlack && (from >> 3) == 6)) {
+			moves.emplace_back({ from, u8(to), ePawn });
+		}
+	}
+
+	serializeMoves(eKnight, moves, true);
+	serializeMoves(eBishop, moves, true);
+	serializeMoves(eRook, moves, true);
+	serializeMoves(eQueen, moves, true);
+	serializeMoves(eKing, moves, true);
+
+	// --- Castling logic ---
+	// King and rook must be on their original squares, and squares between must be empty
+	// e1 = 4, h1 = 7, a1 = 0 (White)
+	// e8 = 60, h8 = 63, a8 = 56 (Black)
+	if (!isCheck()) {
+		if (us == eWhite) {
+			if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back({ e1, g1, eKing });
+			if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back({ e1, c1, eKing });
+		}
+		else {
+			if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back(
+				{ e8, g8, eKing });
+			if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back(
+				{ e8, c8, eKing });
+		}
+	}
+}
+
+void Board::genPseudoLegalCaptures(StaticVector<Move>& moves) {
+	const int them = us ^ 1;
+	u64 our_occ = boards[us][0];
+	u64 their_occ = boards[them][0];
+	u64 all_occ = our_occ | their_occ;
+
+	// PAWNS
+	u64 pawns = boards[us][ePawn];
+	int promo_rank = (us == eWhite) ? 6 : 1;
+
+	// Single pushes
+	u64 single_push = (us == eWhite) ? (pawns << 8) : (pawns >> 8);
+	single_push &= ~all_occ;
+
+	// Pawn captures
+
+	u64 left_captures = BB::get_pawn_attacks(eWest, Side(us), pawns, their_occ);
+	u64 right_captures = BB::get_pawn_attacks(eEast, Side(us), pawns, their_occ);
+
+
+	while (left_captures) {
+		unsigned long to;
+		BB::bitscan_reset(to, left_captures);
+		u8 from = to - ((us == eWhite) ? 7 : -9);
+		if ((from >> 3) == promo_rank) {
+			for (u8 promo = eKnight; promo <= eQueen; ++promo)
+				moves.emplace_back({ from, u8(to), ePawn, piece_board[to], promo });
+		}
+		else {
+			moves.emplace_back({ from,  u8(to), ePawn, piece_board[to] });
+		}
+	}
+	while (right_captures) {
+		unsigned long to;
+		BB::bitscan_reset(to, right_captures);
+		u8 from = to - ((us == eWhite) ? 9 : -7);
+		if ((from >> 3) == promo_rank) {
+			for (u8 promo = eKnight; promo <= eQueen; ++promo)
+				moves.emplace_back({ from, u8(to), ePawn, piece_board[to], promo });
+		}
+		else {
+			moves.emplace_back({ from, u8(to), ePawn, piece_board[to] });
+		}
+	}
+
+
+	if (ep_square != -1) {
+		u8 ep_from = ep_square + (us == eWhite ? -8 : 8);
+		// Left capture
+		if ((ep_square & 7) > 0 && (pawns & BB::set_bit(ep_from - 1))) {
+			moves.emplace_back({ u8(ep_from - 1), u8(ep_square), ePawn, ePawn, eNone, true });
+		}
+		// Right capture
+		if ((ep_square & 7) < 7 && (pawns & BB::set_bit(ep_from + 1))) {
+			moves.emplace_back({ u8(ep_from + 1), u8(ep_square), ePawn, ePawn, eNone, true });
+		}
+	}
+
+	serializeMoves(eKnight, moves, false);
+	serializeMoves(eBishop, moves, false);
+	serializeMoves(eRook, moves, false);
+	serializeMoves(eQueen, moves, false);
+	serializeMoves(eKing, moves, false);
+
+}
+
+void Board::filterToLegal(StaticVector<Move>& moves) {
+	//could be made quicker, perhaps only checking pieces between king and attackers
+	bool current_check = isCheck();
+	int new_i = 0;
+	for (int i = 0; i < moves.size();i++) {
+		Move move = moves[i];
+		if (move.isCastle()) {
+			if (getAttackers((move.to() + move.from()) / 2, us)) {
+				continue;
+			}
+		}
+		
+
+		doMove(move);
+		if (half_move > 100 || is3fold()) {
+			undoMove();
+			continue;
+		}
+		us ^= 1;
+		bool inCheck = isCheck();
+		us ^= 1;
+		undoMove();
+
+		if (!inCheck) {
+			moves[new_i] = moves[i];
+			++new_i;
+		}
+	}
+	moves.resize(new_i);
+
+}
+
+void Board::serializeMoves(Piece piece, StaticVector<Move>& moves, bool quiet) {
+
+	u64 all_occ = boards[eBlack][0] | boards[eWhite][0];
+	u64 our_occ = boards[us][0];
+	u64 attackers = boards[us][piece];
+	u64 mask = quiet ? ~all_occ : all_occ;
+	unsigned long from;
+	while (attackers) {
+		BB::bitscan_reset(from, attackers);
+		u64 targets = 0;
+		switch (piece) {
+		case eKnight: targets = BB::knight_attacks[from] & ~our_occ & mask; break;
+		case eBishop: targets = BB::get_bishop_attacks(from, all_occ) & ~our_occ & mask; break;
+		case eRook: targets = BB::get_rook_attacks(from, all_occ) & ~our_occ & mask; break;
+		case eQueen: targets = BB::get_queen_attacks(from, all_occ) & ~our_occ & mask; break;
+		case eKing: targets = BB::king_attacks[from] & ~our_occ & mask; break;
+		}
+		unsigned long to;
+		while (targets) {
+			BB::bitscan_reset(to, targets);
+			moves.emplace_back({ u8(from),  u8(to), piece, piece_board[to] });
+		}
+	}
 }
 
