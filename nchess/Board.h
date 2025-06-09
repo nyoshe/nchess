@@ -2,7 +2,6 @@
 #include "Misc.h"
 #include "BitBoard.h"
 #include "Move.h"
-#include "Memory.h"
 #include "Tables.h"
 #include <iostream>
 #include <iomanip>
@@ -32,15 +31,13 @@ struct BoardState {
     Move move;
     int eval = 0;
     u16 half_move;
-    
+
     BoardState(int ep_square, u8 castle_flags, Move move, int16_t eval, u64 hash, u16 half_move)
         : ep_square(ep_square), castle_flags(castle_flags), move(move), eval(eval), hash(hash), half_move(half_move) {
     };
 
     auto operator<=>(const BoardState&) const = default;
 };
-
-
 
 struct Zobrist {
     std::array<u64, 12 * 64> piece_at;
@@ -52,7 +49,7 @@ struct Zobrist {
 class Board
 {
 private:
-	// boards[side][0] = occupancy
+    // boards[side][0] = occupancy
     //256 seems big enough, right?
     //std::vector<Move> legal_moves;
     std::array < std::array<u64, 7>, 2 > boards;
@@ -67,30 +64,30 @@ private:
 
         return z;
     }
-    
+
     Zobrist z = initZobristValues();
     std::array<u8, 64> piece_board;
     int16_t eval = 0;
     u64 hash = 0;
     u8 castle_flags = 0b1111;
-	int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
+    int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
 public:
     std::vector<BoardState> state_stack;
     bool us = eWhite;
     int ply = 0;
     u16 half_move = 0;
-	Board();
+    Board();
     // Copy constructor
     Board(const Board& other) = default;
-    	int moveGen(Move* move_list);
-	// Equality operator
+
+    // Equality operator
     bool operator==(const Board& other) const;
 
     void setOccupancy();
 
     //fancy print
-	void printBoard() const;
-	void printBitBoards() const;
+    void printBoard() const;
+    void printBitBoards() const;
     [[nodiscard]] std::string boardString() const; //outputs board string in standard ascii
 
     void doMove(Move move);
@@ -107,31 +104,27 @@ public:
     std::string sanFromMove(Move move);
     Move moveFromUCI(const std::string& uci);
     void loadUci(std::istringstream& uci);
+    void genPseudoLegalCaptures(std::vector<Move>& moves);
+    void serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet);
+
+    void genPseudoLegalMoves(std::vector<Move>& moves);
+    void filterToLegal(std::vector<Move>& pseudo_moves);
+    bool isLegal(Move move);
 
 
-	void genPseudoLegalCaptures(StaticVector<Move>& moves);
-
-    void serializeMoves(Piece piece, StaticVector<Move>& moves, bool quiet);
-
-	void genPseudoLegalMoves(StaticVector<Move>& moves);
-
-    void filterToLegal(StaticVector<Move>& moves);
-    bool isLegal(Move move) ;
-
-
-	//get index of all attackers of a square
+    //get index of all attackers of a square
     [[nodiscard]] u64 getAttackers(int square) const;
-	[[nodiscard]] u64 getAttackers(int square, bool side) const;
+    [[nodiscard]] u64 getAttackers(int square, bool side) const;
     [[nodiscard]] bool isCheck() const;
 
-	[[nodiscard]] u64 getOccupancy() const {
-		return boards[eWhite][0] | boards[eBlack][0];
-	};
+    [[nodiscard]] u64 getOccupancy() const {
+        return boards[eWhite][0] | boards[eBlack][0];
+    };
 
     [[nodiscard]] u64 getPieceBoard(Piece piece) const {
         return boards[eWhite][piece] | boards[eBlack][piece];
     }
-    
+
     //incrementally update eval
     [[nodiscard]] int16_t evalUpdate() const;
 
@@ -140,20 +133,17 @@ public:
 
     void runSanityChecks() const;
     void printMoves() const;
-	void reset();
+    void reset();
 
     std::vector<Move> getLastMoves(int n_moves) const;
 
-	u64 getHash() const;
-	bool is3fold();
+    u64 getHash() const;
+    bool is3fold();
 
     [[nodiscard]] u64 calcHash() const;
 
-	void updateZobrist(Move move);
+    void updateZobrist(Move move);
 
-	int getMobility(bool side) const;
+    int getMobility(bool side) const;
 };
-
-
-
 

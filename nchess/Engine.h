@@ -4,12 +4,7 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_map>
-#include <stack>
 #include "robin_hood.h"
-#include "Memory.h"
-#include "Movegen.h"
-
-
 enum class TType : u8 {
 	INVALID,
 	EXACT,
@@ -49,25 +44,22 @@ struct TimeControl {
 	int movetime = 0;
 };
 
-#define MAX_PLY 64
-
-
 class Engine
 {
 private:
 	int hash_hits;
 	int hash_miss;
 	//Move best_move;
-	
+	static constexpr int MAX_PLY = 64;
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
-	std::array<int, MAX_PLY> pv_length{};
+	std::array<int, MAX_PLY> pv_length;
 	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
 	std::vector<Move> pv_moves;
 	std::vector<TTEntry> tt;
-	std::array<StaticVector<Move>, MAX_PLY> g_move_list;
-	
+
+
 	// Engine state variables
 	int start_ply = 0;
 	u16 max_depth = 0;
@@ -77,12 +69,11 @@ private:
 	float search_calls = 0;
 	float moves_inspected = 0;
 
-    // Timer variables
-    std::clock_t start_time = 0;
+	// Timer variables
+	std::clock_t start_time = 0;
 	int max_time = 0;
 	std::vector<PerfT> perf_values;
 	int pos_count = 0;
-
 
 
 	void perftSearch(int depth);
@@ -93,7 +84,9 @@ public:
 	TimeControl tc;
 	Engine() {
 		tt.resize(1048576);
-		
+		//for (auto& entry : tt) {
+		//	entry = TTEntry();
+		//}
 	}
 
 	std::vector<PerfT> doPerftSearch(int depth);
@@ -105,13 +98,12 @@ public:
 	Move search(int depth);
 	std::vector<Move> getPrincipalVariation() const;
 
-	void printPV(int score);
-
 	std::string getPV();
+	void printPV(int score);
 
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best);
 
-	TTEntry probeTT(u64 hash_key) const{
+	TTEntry probeTT(u64 hash_key) const {
 		hash_key = hash_key & (1048576 - 1);
 		return tt[hash_key];
 	}
@@ -129,27 +121,23 @@ enum class MoveStage {
 	captures,
 	evals
 };
-
 class MoveGen {
-	int move_len;
 	std::vector<std::pair<int, Move>> fallback_moves;
 	MoveStage stage = MoveStage::ttMove;
 	bool init = false;
 public:
-	MoveGen() = default;
-	Move getNext(Engine& e, Board& b, StaticVector<Move>& moves) {
-		if (moves.empty()) return Move();
+
+	Move getNext(Engine& e, Board& b, std::vector<Move>& moves) {
 		Move out;
 		TTEntry entry = e.probeTT(e.b.getHash());
 		if (stage == MoveStage::ttMove) {
 			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
 			if (pos_best != moves.end()) {
 				out = *pos_best;
-				*pos_best = moves.pop_back();
+				moves.erase(pos_best);
 				stage = MoveStage::captures;
 				return out;
 			}
-			stage = MoveStage::captures;
 		}
 
 
@@ -157,9 +145,9 @@ public:
 			auto mvv_lva = [](const auto& a, const auto& b) {
 				return piece_vals[a.captured()] * 10 - piece_vals[a.piece()] < piece_vals[b.captured()] * 10 - piece_vals[b.piece()];
 				};
-			auto pos_best = std::max_element(moves.begin(), moves.end(), mvv_lva);
+			auto pos_best = std::ranges::max_element(moves.begin(), moves.end(), mvv_lva);
 			out = *pos_best;
-			*pos_best = moves.pop_back();
+			moves.erase(pos_best);
 			return out;
 		}
 		else {
@@ -186,6 +174,4 @@ public:
 		}
 		return Move();
 	}
-
 };
-
