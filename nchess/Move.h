@@ -14,6 +14,7 @@ private:
 	//bits 15-17: captured piece type
 	//bits 18-20: promotion 
 	//bit 21: ep flag
+	//bit 22-32: rating
 public:
 	constexpr Move() = default;
 
@@ -82,4 +83,17 @@ public:
 	[[nodiscard]] explicit constexpr operator bool() const {
 		return data != 0;
 	}
+
+    void setEval(int eval_score) {
+	    // Bits 22-31 (10 bits) are used for eval score, signed from -512 to +511
+	    // Clamp eval_score to [-512, 511]
+	    if (eval_score < -512) eval_score = -512;
+	    if (eval_score > 511) eval_score = 511;
+	    // Convert to unsigned for storage (two's complement in 10 bits)
+	    uint32_t eval_bits = static_cast<uint32_t>(eval_score & 0x3FF);
+	    // Clear previous eval bits
+	    data &= ~(0x3FFu << 22);
+	    // Set new eval bits
+	    data |= (eval_bits << 22);
+    }
 };

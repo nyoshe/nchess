@@ -15,6 +15,8 @@
 #include <cassert>
 #include <sstream>
 #include <ranges>
+
+#include "Memory.h"
 #include "robin_hood.h"
 
 inline u64 rnd64()
@@ -104,11 +106,11 @@ public:
     std::string sanFromMove(Move move);
     Move moveFromUCI(const std::string& uci);
     void loadUci(std::istringstream& uci);
-    void genPseudoLegalCaptures(std::vector<Move>& moves);
-    void serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet);
+    void genPseudoLegalCaptures(StaticVector<Move>& moves);
+    void serializeMoves(Piece piece, StaticVector<Move>& moves, bool quiet);
 
-    void genPseudoLegalMoves(std::vector<Move>& moves);
-    void filterToLegal(std::vector<Move>& pseudo_moves);
+    void genPseudoLegalMoves(StaticVector<Move>& moves);
+    void filterToLegal(StaticVector<Move>& pseudo_moves);
     bool isLegal(Move move);
 
 

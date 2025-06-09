@@ -455,7 +455,7 @@ void Board::loadFen(std::istringstream& fen_stream) {
 }
 
 Move Board::moveFromUCI(const std::string& uci) {
-	std::vector<Move> moves;
+	StaticVector<Move> moves;
 	genPseudoLegalMoves(moves);
 	filterToLegal(moves);
 
@@ -500,7 +500,7 @@ void Board::loadUci(std::istringstream& iss) {
 Move Board::moveFromSan(const std::string& san) {
 	std::string move = san;
 
-	std::vector<Move> moves;
+	StaticVector<Move> moves;
 	genPseudoLegalMoves(moves);
 	filterToLegal(moves);
 	// Remove check/mate symbols
@@ -637,7 +637,7 @@ std::string Board::sanFromMove(Move move) {
 	}
 
 	// Handle disambiguation
-	std::vector<Move> moves;
+	StaticVector<Move> moves;
 	genPseudoLegalMoves(moves);
 
 	filterToLegal(moves);
@@ -681,7 +681,7 @@ std::string Board::sanFromMove(Move move) {
 	return san;
 }
 
-void Board::genPseudoLegalMoves(std::vector<Move>& moves) {
+void Board::genPseudoLegalMoves(StaticVector<Move>& moves) {
 	const int them = us ^ 1;
 
 	u64 our_occ = boards[us][0];
@@ -708,10 +708,10 @@ void Board::genPseudoLegalMoves(std::vector<Move>& moves) {
 		if ((from >> 3) == promo_rank) {
 			// Promotions
 			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, eNone, promo);
+				moves.emplace_back({ u8(from), u8(to), ePawn, eNone, u8(promo) });
 		}
 		else {
-			moves.emplace_back(from, to, ePawn);
+			moves.emplace_back({ u8(from), u8(to), ePawn });
 		}
 	}
 
@@ -723,7 +723,7 @@ void Board::genPseudoLegalMoves(std::vector<Move>& moves) {
 		BB::bitscan_reset(to, attacks);
 		int from = to + (us == eWhite ? -16 : 16);
 		if ((us == eWhite && (from >> 3 == 1)) || (us == eBlack && (from >> 3) == 6)) {
-			moves.emplace_back(from, to, ePawn);
+			moves.emplace_back({ u8(from), u8(to), ePawn });
 		}
 	}
 
@@ -739,19 +739,21 @@ void Board::genPseudoLegalMoves(std::vector<Move>& moves) {
 	// e8 = 60, h8 = 63, a8 = 56 (Black)
 	if (!isCheck()) {
 		if (us == eWhite) {
-			if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back(e1, g1, eKing);
-			if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back(e1, c1, eKing);
+			if ((castle_flags & wShortCastleFlag) && !(u64(0b01100000) & all_occ)) moves.emplace_back({ e1, g1, eKing });
+			if ((castle_flags & wLongCastleFlag) && !(u64(0b00001110) & all_occ)) moves.emplace_back({e1, c1, eKing});
 		}
 		else {
-			if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back(
-				e8, g8, eKing);
-			if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back(
-				e8, c8, eKing);
+			if ((castle_flags & bShortCastleFlag) && !((u64(0b01100000) << 56) & all_occ)) moves.emplace_back({
+				e8, g8, eKing
+				});
+			if ((castle_flags & bLongCastleFlag) && !((u64(0b00001110) << 56) & all_occ)) moves.emplace_back({
+				e8, c8, eKing
+		});
 		}
 	}
 }
 
-void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
+void Board::genPseudoLegalCaptures(StaticVector<Move>& moves) {
 	const int them = us ^ 1;
 	u64 our_occ = boards[us][0];
 	u64 their_occ = boards[them][0];
@@ -777,10 +779,11 @@ void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 		int from = to - ((us == eWhite) ? 7 : -9);
 		if ((from >> 3) == promo_rank) {
 			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, piece_board[to], promo);
+				moves.emplace_back({ u8(from), u8(to), ePawn, piece_board[to], u8(promo) });
 		}
 		else {
-			moves.emplace_back(from, to, ePawn, piece_board[to]);
+			moves.emplace_back({u8(from), u8(to), ePawn, piece_board[to]
+		});
 		}
 	}
 	while (right_captures) {
@@ -789,10 +792,11 @@ void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 		int from = to - ((us == eWhite) ? 9 : -7);
 		if ((from >> 3) == promo_rank) {
 			for (int promo = eKnight; promo <= eQueen; ++promo)
-				moves.emplace_back(from, to, ePawn, piece_board[to], promo);
+				moves.emplace_back({u8(from), u8(to), ePawn, piece_board[to], u8(promo)
+		});
 		}
 		else {
-			moves.emplace_back(from, to, ePawn, piece_board[to]);
+			moves.emplace_back({ u8(from), u8(to), ePawn, piece_board[to] });
 		}
 	}
 
@@ -801,11 +805,11 @@ void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 		int ep_from = ep_square + (us == eWhite ? -8 : 8);
 		// Left capture
 		if ((ep_square & 7) > 0 && (pawns & BB::set_bit(ep_from - 1))) {
-			moves.emplace_back(ep_from - 1, ep_square, ePawn, ePawn, eNone, true);
+			moves.emplace_back({ u8(ep_from - 1), u8(ep_square), ePawn, ePawn, eNone, true });
 		}
 		// Right capture
 		if ((ep_square & 7) < 7 && (pawns & BB::set_bit(ep_from + 1))) {
-			moves.emplace_back(ep_from + 1, ep_square, ePawn, ePawn, eNone, true);
+			moves.emplace_back({ u8(ep_from + 1), u8(ep_square), ePawn, ePawn, eNone, true });
 		}
 	}
 
@@ -817,7 +821,7 @@ void Board::genPseudoLegalCaptures(std::vector<Move>& moves) {
 
 }
 
-void Board::serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet) {
+void Board::serializeMoves(Piece piece, StaticVector<Move>& moves, bool quiet) {
 
 	u64 all_occ = boards[eBlack][0] | boards[eWhite][0];
 	u64 our_occ = boards[us][0];
@@ -837,30 +841,31 @@ void Board::serializeMoves(Piece piece, std::vector<Move>& moves, bool quiet) {
 		unsigned long to;
 		while (targets) {
 			BB::bitscan_reset(to, targets);
-			moves.emplace_back(from, to, piece, piece_board[to]);
+			moves.emplace_back({ u8(from), u8(to), piece, piece_board[to] });
 		}
 	}
 }
 
-void Board::filterToLegal(std::vector<Move>& moves) {
+void Board::filterToLegal(StaticVector<Move>& moves) {
 	//could be made quicker, perhaps only checking pieces between king and attackers
-	bool current_check = isCheck();
-	for (int i = 0; i < moves.size();) {
+	int new_i = 0;
+	//bool current_check = isCheck();
+	for (int i = 0; i < moves.size();i++) {
 		Move move = moves[i];
 		if (move.isCastle()) {
 			if (getAttackers((move.to() + move.from()) / 2, us)) {
-				moves.erase(moves.begin() + i);
+				//moves.erase(moves.begin() + i);
 				continue;
 			}
 		}
 		if (is3fold()) {
-			moves.erase(moves.begin() + i);
+			//moves.erase(moves.begin() + i);
 			continue;
 		}
 
 		doMove(move);
 		if (half_move > 100) {
-			moves.erase(moves.begin() + i);
+			//moves.erase(moves.begin() + i);
 			undoMove();
 			continue;
 		}
@@ -870,18 +875,21 @@ void Board::filterToLegal(std::vector<Move>& moves) {
 		undoMove();
 
 		if (!inCheck) {
-			++i;
+			//i++
+			moves[new_i] = moves[i];
+			new_i++;
 			continue;
 		}
 		else {
-			moves.erase(moves.begin() + i);
+			//moves.erase(moves.begin() + i);
 		}
 	}
-
+	moves.resize(new_i);
 }
 
 bool Board::isLegal(Move move) {
-	std::vector<Move> vmove = { move };
+	StaticVector<Move> vmove;
+	vmove.emplace_back(move);
 	if (move.raw() == 0) return false;
 
 	if (piece_board[move.from()] == move.piece() && piece_board[move.to()] == move.captured()) {

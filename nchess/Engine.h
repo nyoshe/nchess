@@ -4,6 +4,8 @@
 #include <ctime>
 #include <algorithm>
 #include <unordered_map>
+
+#include "Memory.h"
 #include "robin_hood.h"
 enum class TType : u8 {
 	INVALID,
@@ -61,7 +63,7 @@ private:
 
 
 	// Engine state variables
-	int start_ply = 0;
+	
 	u16 max_depth = 0;
 	int nodes = 0;
 	int current_age = 0;
@@ -80,6 +82,8 @@ private:
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta);
 public:
+	std::array<StaticVector<int>, 64> eval_vec;
+	int start_ply = 0;
 	Board b;
 	TimeControl tc;
 	Engine() {
@@ -88,6 +92,8 @@ public:
 		//	entry = TTEntry();
 		//}
 	}
+	std::array<StaticVector<Move>, 64> move_vec;
+
 
 	std::vector<PerfT> doPerftSearch(int depth);
 	std::vector<PerfT> doPerftSearch(std::string position, int depth);
@@ -125,16 +131,19 @@ class MoveGen {
 	std::vector<std::pair<int, Move>> fallback_moves;
 	MoveStage stage = MoveStage::ttMove;
 	bool init = false;
+	
 public:
 
-	Move getNext(Engine& e, Board& b, std::vector<Move>& moves) {
+	Move getNext(Engine& e, Board& b, StaticVector<Move>& moves) {
 		Move out;
 		TTEntry entry = e.probeTT(e.b.getHash());
 		if (stage == MoveStage::ttMove) {
 			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
 			if (pos_best != moves.end()) {
 				out = *pos_best;
-				moves.erase(pos_best);
+				*pos_best = moves.back();
+				moves.pop_back();
+
 				stage = MoveStage::captures;
 				return out;
 			}
@@ -147,29 +156,40 @@ public:
 				};
 			auto pos_best = std::ranges::max_element(moves.begin(), moves.end(), mvv_lva);
 			out = *pos_best;
-			moves.erase(pos_best);
+			*pos_best = moves.back();
+			moves.pop_back();
 			return out;
 		}
 		else {
 			stage = MoveStage::evals;
 		}
-
-		if (stage == MoveStage::evals && fallback_moves.empty() && !init) {
+		
+		
+		if (stage == MoveStage::evals && !init) {
 			init = true;
+			int eval_ply = b.ply - e.start_ply;
+			e.eval_vec[eval_ply].clear();
 			for (auto& move : moves) {
 				b.doMove(move);
-				fallback_moves.emplace_back(-b.getEval(), move);
+				e.eval_vec[eval_ply].emplace_back(-b.getEval());
 				b.undoMove();
 			}
-			auto func = [](const auto& a, const auto& b) {
-				return a.first > b.first; // Sort descending by eval
-				};
-
-			std::ranges::sort(fallback_moves, func);
 		}
-		if (stage == MoveStage::evals && !fallback_moves.empty()) {
-			out = fallback_moves.front().second;
-			fallback_moves.erase(fallback_moves.begin());
+		
+		if (stage == MoveStage::evals && !moves.empty()) {
+			int eval_ply = b.ply - e.start_ply;
+			auto pos_best = std::ranges::max_element(e.eval_vec[eval_ply].begin(), e.eval_vec[eval_ply].end());
+
+			int pos = std::distance(e.eval_vec[eval_ply].begin(), pos_best);
+			out = moves[pos];
+			moves[pos] = moves.back();
+			moves.pop_back();
+
+			*pos_best = e.eval_vec[eval_ply].back();
+			e.eval_vec[eval_ply].pop_back();
+
+
+			
 			return out;
 		}
 		return Move();
