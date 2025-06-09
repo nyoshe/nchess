@@ -137,6 +137,7 @@ Move Engine::search(int depth) {
 		}
 
 		std::sort(sorted_moves.begin(), sorted_moves.end(), [](const auto& a, const auto& b) { return a.first > b.first;  });
+		if (checkTime()) break;
 		printPV(alpha);
 
 	}
@@ -278,6 +279,14 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	if (depth_left == 0 && in_check) { depth_left++; }
 	if (depth_left <= 0) return quiesce(alpha, beta);
 
+	u64 hash_key = b.getHash();
+	TTEntry entry = probeTT(hash_key);
+
+	if (entry && entry.search_depth >= max_depth && entry.depth_left >= depth_left && entry.hash == b.getHash()) {
+		if (entry.type == TType::EXACT) return entry.eval;
+		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
+		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
+	}
 
 	int best = -100000;
 	Move best_move;
@@ -343,6 +352,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			!move.isEnPassant() &&
 			!in_check) {
 			b.undoMove();
+
 			move = move_gen.getNext(*this, b, move_vec[search_ply]);
 			i++;
 			continue;
@@ -413,13 +423,15 @@ std::vector<Move> Engine::getPrincipalVariation() const {
 }
 
 void Engine::printPV(int score) {
+	if (score == 99950) {
+		std::cout << "huh";
+	}
 	std::vector<Move> pv = getPrincipalVariation();
 	//if (!pv.empty()) {
 	std::cout << "info score cp " << score << " depth " << max_depth
 		<< " nodes " << nodes
 		<< " nps " << static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC))
-	<< " hh " << std::to_string(hash_hits);
-	std::cout << " pv ";
+	    << " pv ";
 
 	for (auto& move : pv) {
 		std::cout << move.toUci() << " ";
@@ -436,7 +448,7 @@ std::string Engine::getPV() {
 		std::string out = "depth " + std::to_string(max_depth)
 			+ " nodes " + std::to_string(nodes)
 			+ " nps " + std::to_string(static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC)))
-			+ " hh " + std::to_string(hash_hits) +
+			+ " hash hits " + std::to_string(hash_hits) +
 			+ " pv ";
 
 		for (auto& move : pv) {
@@ -449,10 +461,10 @@ std::string Engine::getPV() {
 }
 
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best) {
-	hash_key = hash_key & (1048576 - 1);
+	u64 index = hash_key & (1048576 - 1);
 
-	if (tt[hash_key].ply <= start_ply || tt[hash_key].depth_left <= depth_left) { //replace
-		tt[hash_key] = TTEntry{ score, u8(depth_left), u16(start_ply), u8(max_depth), type, best };
+	if (tt[index].ply <= start_ply || tt[index].depth_left <= depth_left) { //replace
+		tt[index] = TTEntry{ hash_key, score, u8(depth_left), u16(start_ply), u8(max_depth), type, best };
 
 	}
 }

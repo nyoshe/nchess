@@ -16,6 +16,7 @@ enum class TType : u8 {
 };
 
 struct TTEntry {
+	u64 hash;
 	int eval = 0;
 	u8 depth_left = 0;
 	u16 ply = 0;
@@ -24,6 +25,7 @@ struct TTEntry {
 	Move best_move;
 	TTEntry& operator=(const TTEntry& other) {
 		if (this != &other) {
+			hash = other.hash;
 			eval = other.eval;
 			depth_left = other.depth_left;
 			ply = other.ply;
@@ -55,7 +57,7 @@ private:
 	static constexpr int MAX_PLY = 64;
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 
-	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
+
 	std::array<int, MAX_PLY> pv_length;
 	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
 	std::vector<Move> pv_moves;
@@ -82,6 +84,7 @@ private:
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta);
 public:
+	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	int hash_hits = 0;
 	std::array<StaticVector<int>, 64> eval_vec;
 	int start_ply = 0;
@@ -126,18 +129,25 @@ public:
 enum class MoveStage {
 	ttMove,
 	captures,
+	history,
 	evals
 };
 class MoveGen {
-	std::vector<std::pair<int, Move>> fallback_moves;
+private:
 	MoveStage stage = MoveStage::ttMove;
 	bool init = false;
-	
 public:
 
 	Move getNext(Engine& e, Board& b, StaticVector<Move>& moves) {
+		assert(init == (stage == MoveStage::evals));
+
+		if (moves.empty()) {
+			return Move(0, 0);
+		}
 		Move out;
+
 		TTEntry entry = e.probeTT(e.b.getHash());
+
 		if (stage == MoveStage::ttMove) {
 			
 			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
@@ -149,9 +159,11 @@ public:
 
 				stage = MoveStage::captures;
 				return out;
+			} else {
+				stage = MoveStage::captures;
 			}
 		}
-
+		
 
 		if (stage == MoveStage::captures && moves.end() != std::find_if(moves.begin(), moves.end(), [](const auto& m) {return m.captured();})) {
 			auto mvv_lva = [](const auto& a, const auto& b) {
@@ -162,11 +174,36 @@ public:
 			*pos_best = moves.back();
 			moves.pop_back();
 			return out;
+		} else if (stage == MoveStage::captures) {
+			stage = MoveStage::history;
 		}
-		else {
-			stage = MoveStage::evals;
-		}
+
 		
+
+
+		if (stage == MoveStage::history) {
+			int max = -100000;
+			int index = 0;
+
+			for (int i = 0; i < moves.size(); i++) {
+				int val = e.history_table[b.us][moves[i].from()][moves[i].to()];
+				if (val > max) {
+					max = val;
+					index = i;
+				}
+				i++;
+			}
+
+			if (max > 0) {
+				out = moves[index];
+				moves[index] = moves.back();
+				moves.pop_back();
+				return out;
+			} else {
+				stage = MoveStage::evals;
+			}
+			
+		}
 		
 		if (stage == MoveStage::evals && !init) {
 			init = true;
@@ -178,8 +215,8 @@ public:
 				b.undoMove();
 			}
 		}
-		
-		if (stage == MoveStage::evals && !moves.empty()) {
+		assert(init == (stage == MoveStage::evals));
+		if (stage == MoveStage::evals && !moves.empty() && init) {
 			int eval_ply = b.ply - e.start_ply;
 			auto pos_best = std::ranges::max_element(e.eval_vec[eval_ply].begin(), e.eval_vec[eval_ply].end());
 

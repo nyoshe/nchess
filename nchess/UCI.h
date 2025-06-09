@@ -101,7 +101,7 @@ Moves; f6e4 d1d5 f7f5 f1c4 d8e7 e1g1 c6b4 d5d1 b4c6 b1c3 c6e5 c3d5 e5f3 d1f3 e7c
                 setupBoard(test);
                 engine_.b.printBoard();
                 std::cout << engine_.b.boardString();
-                std::istringstream go_stream("go movetime 10000000");
+                std::istringstream go_stream("go movetime 500000");
                 handleGo(go_stream);
             }
             // Add more UCI commands as needed

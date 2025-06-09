@@ -2,6 +2,7 @@
 
 
 Board::Board() {
+	state_stack.reserve(512);
 	reset();
 }
 
