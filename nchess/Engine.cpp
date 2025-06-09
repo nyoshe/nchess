@@ -42,13 +42,7 @@ void Engine::perftSearch(int d) {
 }
 /**/
 Move Engine::search(int depth) {
-	for (auto& i : history_table) {
-		for (auto& j : i) {
-			for (auto& k : j) {
-				k = 0;
-			}
-		}
-	}
+	
 	for (auto& i : pv_table) {
 		for (auto& j : i) {
 			j = Move();
@@ -331,9 +325,11 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	int i = 0;
 	search_calls++;
 	MoveGen move_gen;
-	Move move = move_gen.getNext(*this, b, move_vec[search_ply]);
-	while (move.raw()) {
+
+	seen_quiets[search_ply].clear();
+	while (const Move move = move_gen.getNext(*this, b, move_vec[search_ply])) {
 		moves_inspected++;
+
 		int score = 0;
 		bool can_reduce =
 			i >= 3 &&
@@ -353,7 +349,6 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			!in_check) {
 			b.undoMove();
 
-			move = move_gen.getNext(*this, b, move_vec[search_ply]);
 			i++;
 			continue;
 		}
@@ -396,13 +391,25 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 				// Store as killer move
 				killer_moves[search_ply][1] = killer_moves[search_ply][0];
 				killer_moves[search_ply][0] = move;
+				int bonus = std::min(7 * depth_left * depth_left + 274 * depth_left - 182, 2048);
+				int malus = std::min(-(5 * depth_left * depth_left + 283 * depth_left + 169), 1024);
+				bonus = std::clamp((int)bonus, int(-16383), int(16383));
+				malus = std::clamp((int)malus, int(-16383), int(16383));
+				history_table[b.us][move.from()][move.to()] +=
+					bonus - history_table[b.us][move.from()][move.to()] * abs(bonus) / 16383;
+				for (auto& quiet : seen_quiets[search_ply]) {
+					history_table[b.us][quiet.from()][quiet.to()] += 
+						malus - history_table[b.us][quiet.from()][quiet.to()] * abs(malus) / 16383;
+				}
 			}
-
-			if (!move.captured()) history_table[!b.us][move.from()][move.to()] += depth_left * depth_left;
+			
+			
 			storeTTEntry(b.getHash(), beta, TType::BETA, depth_left, best_move);
 			return beta;
 		}
-		move = move_gen.getNext(*this, b, move_vec[search_ply]);
+		if (!move.captured()) {
+			seen_quiets[search_ply].emplace_back(move);
+		}
 	}
 	if (best <= alpha) {
 		// fail-low node - none of the moves improved alpha
@@ -525,6 +532,15 @@ int Engine::quiesce(int alpha, int beta) {
 		alpha = stand_pat;
 	}
 
+	u64 hash_key = b.getHash();
+	TTEntry entry = probeTT(hash_key);
+
+	if (entry && entry.depth_from_root >= max_depth && entry.hash == b.getHash()) {
+		if (entry.type == TType::EXACT) return entry.eval;
+		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
+		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
+	}
+
 
 	move_vec[search_ply].clear();
 	b.genPseudoLegalCaptures(move_vec[search_ply]);
@@ -553,20 +569,19 @@ int Engine::quiesce(int alpha, int beta) {
 		b.undoMove();
 
 		if (score >= beta) {
-			//best_move = move;
-			//storeTTEntry(b.getHash(), beta, TType::ALPHA, 0, best_move);
+			best_move = move;
+			storeTTEntry(b.getHash(), beta, TType::BETA, 0, best_move);
 			return score;
 		}
 
 		if (score > best) {
 			best_move = move;
-			//storeTTEntry(b.getHash(), beta, TType::ALPHA, 0, best_move);
 			best = score;
 		}
-		if (score > alpha) {
 
-			//storeTTEntry(b.getHash(), beta, TType::ALPHA, 0, best_move);
+		if (score > alpha) {
 			alpha = score;
+			storeTTEntry(b.getHash(), alpha, TType::ALPHA, 0, best_move);
 		}
 		move = move_gen.getNext(*this, b, move_vec[search_ply]);
 	}

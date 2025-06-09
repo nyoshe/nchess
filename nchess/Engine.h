@@ -77,14 +77,19 @@ public:
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	int hash_hits = 0;
 	std::array<StaticVector<int>, 64> eval_vec;
+	std::array<StaticVector<Move>, 64> seen_quiets;
 	int start_ply = 0;
 	Board b;
 	TimeControl tc;
 	Engine() {
 		tt.resize(hash_size);
-		//for (auto& entry : tt) {
-		//	entry = TTEntry();
-		//}
+		for (auto& i : history_table) {
+			for (auto& j : i) {
+				for (auto& k : j) {
+					k = 0;
+				}
+			}
+		}
 	}
 	std::array<StaticVector<Move>, 64> move_vec;
 
@@ -168,9 +173,6 @@ public:
 			stage = MoveStage::history;
 		}
 
-		
-
-
 		if (stage == MoveStage::history) {
 			int max = -100000;
 			int index = 0;
@@ -181,20 +183,14 @@ public:
 					max = val;
 					index = i;
 				}
-				i++;
 			}
-
-			if (max > 0) {
-				out = moves[index];
-				moves[index] = moves.back();
-				moves.pop_back();
-				return out;
-			} else {
-				stage = MoveStage::evals;
-			}
-			
+			out = moves[index];
+			moves[index] = moves.back();
+			moves.pop_back();
+			return out;
 		}
-		
+
+		/*
 		if (stage == MoveStage::evals && !init) {
 			init = true;
 			int eval_ply = b.ply - e.start_ply;
@@ -219,6 +215,7 @@ public:
 
 			return out;
 		}
+		*/
 		return Move();
 	}
 };
