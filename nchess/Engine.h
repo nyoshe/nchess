@@ -49,7 +49,7 @@ struct TimeControl {
 class Engine
 {
 private:
-	int hash_hits;
+
 	int hash_miss;
 	//Move best_move;
 	static constexpr int MAX_PLY = 64;
@@ -82,6 +82,7 @@ private:
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta);
 public:
+	int hash_hits = 0;
 	std::array<StaticVector<int>, 64> eval_vec;
 	int start_ply = 0;
 	Board b;
@@ -138,9 +139,11 @@ public:
 		Move out;
 		TTEntry entry = e.probeTT(e.b.getHash());
 		if (stage == MoveStage::ttMove) {
+			
 			auto pos_best = std::find(moves.begin(), moves.end(), entry.best_move);
 			if (pos_best != moves.end()) {
 				out = *pos_best;
+				e.hash_hits++;
 				*pos_best = moves.back();
 				moves.pop_back();
 
