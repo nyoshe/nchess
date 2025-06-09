@@ -282,7 +282,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	u64 hash_key = b.getHash();
 	TTEntry entry = probeTT(hash_key);
 
-	if (entry && entry.search_depth >= max_depth && entry.depth_left >= depth_left && entry.hash == b.getHash()) {
+	if (entry && entry.depth_from_root >= max_depth && entry.depth_left >= depth_left && entry.hash == b.getHash()) {
 		if (entry.type == TType::EXACT) return entry.eval;
 		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
 		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
@@ -372,7 +372,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 				score = -alphaBeta(-beta, -alpha, depth_left - 1, true);
 			}
 		}
-
+		
 		b.undoMove();
 
 		i++;
@@ -461,8 +461,9 @@ std::string Engine::getPV() {
 }
 
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best) {
-	u64 index = hash_key & (1048576 - 1);
-
+	//u64 index = hash_key & (1048576 - 1);
+	
+	u64 index = __mulh(hash_key & 0x7FFFFFFFFFFFFFFF, hash_size);
 	if (tt[index].ply <= start_ply || tt[index].depth_left <= depth_left) { //replace
 		tt[index] = TTEntry{ hash_key, score, u8(depth_left), u16(start_ply), u8(max_depth), type, best };
 

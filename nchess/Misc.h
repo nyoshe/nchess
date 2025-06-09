@@ -1,12 +1,17 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <cstddef>
 
-typedef unsigned long long u64;
-typedef uint16_t u16;
-typedef uint8_t u8;
-typedef int8_t i8;
+using u64 = unsigned long long;
+using u32 = uint32_t;
+using u16 = uint16_t;
+using u8 = uint8_t;
+using i8 = int8_t;
 using usize = std::size_t;
+
+
+
 
 enum Piece : u8 {
 	eNone, ePawn, eKnight, eBishop, eRook, eQueen, eKing

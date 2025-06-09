@@ -20,21 +20,10 @@ struct TTEntry {
 	int eval = 0;
 	u8 depth_left = 0;
 	u16 ply = 0;
-	u8 search_depth = 0;
+	u8 depth_from_root = 0;
 	TType type = TType::INVALID;
 	Move best_move;
-	TTEntry& operator=(const TTEntry& other) {
-		if (this != &other) {
-			hash = other.hash;
-			eval = other.eval;
-			depth_left = other.depth_left;
-			ply = other.ply;
-			search_depth = other.search_depth;
-			type = other.type;
-			best_move = other.best_move;
-		}
-		return *this;
-	}
+
 	[[nodiscard]] explicit constexpr operator bool() const {
 		return type != TType::INVALID;
 	}
@@ -55,6 +44,7 @@ private:
 	int hash_miss;
 	//Move best_move;
 	static constexpr int MAX_PLY = 64;
+	static constexpr u64 hash_size = 32e6 / sizeof(TTEntry);
 	std::array<std::array<Move, MAX_PLY>, MAX_PLY> pv_table;
 
 
@@ -91,7 +81,7 @@ public:
 	Board b;
 	TimeControl tc;
 	Engine() {
-		tt.resize(1048576);
+		tt.resize(hash_size);
 		//for (auto& entry : tt) {
 		//	entry = TTEntry();
 		//}
@@ -114,8 +104,8 @@ public:
 	void storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best);
 
 	TTEntry probeTT(u64 hash_key) const {
-		hash_key = hash_key & (1048576 - 1);
-		return tt[hash_key];
+		u64 index = __mulh(hash_key & 0x7FFFFFFFFFFFFFFF, hash_size);
+		return tt[index];
 	}
 
 	bool checkTime();
