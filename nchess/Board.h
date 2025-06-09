@@ -34,7 +34,7 @@ struct BoardState {
     int eval = 0;
     u16 half_move;
 
-    BoardState(int ep_square, u8 castle_flags, Move move, int16_t eval, u64 hash, u16 half_move)
+    BoardState(int ep_square, u8 castle_flags, Move move, int eval, u64 hash, u16 half_move)
         : ep_square(ep_square), castle_flags(castle_flags), move(move), eval(eval), hash(hash), half_move(half_move) {
     };
 
@@ -69,7 +69,7 @@ private:
 
     Zobrist z = initZobristValues();
     std::array<u8, 64> piece_board;
-    int16_t eval = 0;
+    int eval = 0;
     u64 hash = 0;
     u8 castle_flags = 0b1111;
     int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
@@ -128,9 +128,12 @@ public:
     }
 
     //incrementally update eval
-    [[nodiscard]] int16_t evalUpdate() const;
+    [[nodiscard]] int evalUpdate(Move move) ;
 
-    [[nodiscard]] int16_t getEval() const { return eval; };
+    [[nodiscard]] int getEval()  {
+        eval = evalFullUpdate();
+	    return us == eWhite ? eval : -eval;
+    };
 
 
     void runSanityChecks() const;
@@ -147,5 +150,70 @@ public:
     void updateZobrist(Move move);
 
     int getMobility(bool side) const;
+
+    int evalFullUpdate() {
+        int out = 0;
+        int16_t game_phase = 24 -
+            BB::popcnt(boards[eWhite][eKnight]) -
+            BB::popcnt(boards[eWhite][eBishop]) -
+            BB::popcnt(boards[eWhite][eRook]) * 2 -
+            BB::popcnt(boards[eWhite][eQueen]) * 4 -
+            BB::popcnt(boards[eBlack][eKnight]) -
+            BB::popcnt(boards[eBlack][eBishop]) -
+            BB::popcnt(boards[eBlack][eRook]) * 2 -
+            BB::popcnt(boards[eBlack][eQueen]) * 4
+            ;
+
+        int mg_val = 0;
+        int eg_val = 0;
+        u64 white_squares = boards[eWhite][0];
+        unsigned long at;
+        while (white_squares) {
+            BB::bitscan_reset(at, white_squares);
+            u8 p = piece_board[at];
+            u8 sq = at ^ 56;
+            mg_val += mg_table[p][sq];
+            eg_val += eg_table[p][sq];
+        }
+
+        u64 black_squares = boards[eBlack][0];
+        at = 0;
+        while (black_squares) {
+            BB::bitscan_reset(at, black_squares);
+            u8 p = piece_board[at];
+            u8 sq = at;
+            mg_val -= mg_table[p][sq];
+            eg_val -= eg_table[p][sq];
+        }
+
+        out += (mg_val + (game_phase * eg_val - mg_val) / 24);
+        /*
+        //count doubled pawns
+        //count isolated and doubled
+        for (int file = 0; file < 8; file++) {
+            if (boards[eWhite][ePawn] & BB::files[file])
+                out -= (boards[eWhite][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
+            if (boards[eBlack][ePawn] & BB::files[file])
+                out += (boards[eBlack][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
+
+            out -= 30 * (BB::popcnt(boards[eWhite][ePawn] & BB::files[file]) >= 2);
+            out += 30 * (BB::popcnt(boards[eBlack][ePawn] & BB::files[file]) >= 2);
+        }
+
+        //count defenders
+        u64 w_east_defenders = BB::get_pawn_attacks(eEast, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
+        u64 w_west_defenders = BB::get_pawn_attacks(eWest, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
+        u64 b_east_defenders = BB::get_pawn_attacks(eEast, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
+        u64 b_west_defenders = BB::get_pawn_attacks(eWest, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
+
+        //single defenders
+        out += 3 * (BB::popcnt(w_east_defenders | w_west_defenders) - BB::popcnt(b_east_defenders | b_west_defenders));
+        //out += 4 * (getMobility(eWhite) - getMobility(eBlack));
+        //double defenders
+        //out += var * (BB::popcnt(w_east_defenders & w_west_defenders) - BB::popcnt(b_east_defenders & b_west_defenders));
+        out = us == eWhite ? out : -out;
+		*/
+        return out;
+    }
 };
 

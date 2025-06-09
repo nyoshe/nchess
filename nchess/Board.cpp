@@ -45,6 +45,7 @@ void Board::setOccupancy() {
 
 void Board::doMove(Move move) {
 	state_stack.emplace_back(ep_square, castle_flags, move, eval, hash, half_move);
+
 	//null move
 	if (move.from() == move.to()) {
 		us = !us;
@@ -53,7 +54,6 @@ void Board::doMove(Move move) {
 		if (state_stack.back().ep_square != -1) hash ^= z.ep_file[state_stack.back().ep_square & 0x7];
 		if (ep_square != -1) hash ^= z.ep_file[ep_square & 0x7];
 
-		eval = evalUpdate();
 		// Increment ply count  
 		ply++;
 		ep_square = -1;
@@ -133,7 +133,6 @@ void Board::doMove(Move move) {
 
 	//pos_history[hash]++;
 
-	eval = evalUpdate();
 	// Increment ply count  
 	ply++;
 
@@ -451,6 +450,7 @@ void Board::loadFen(std::istringstream& fen_stream) {
 	// Recompute occupancy
 	setOccupancy();
 	hash = calcHash();
+	eval = evalFullUpdate();
 	runSanityChecks();
 }
 
@@ -495,6 +495,10 @@ void Board::loadUci(std::istringstream& iss) {
 			}
 		}
 	}
+	setOccupancy();
+	hash = calcHash();
+	eval = evalFullUpdate();
+	runSanityChecks();
 }
 
 Move Board::moveFromSan(const std::string& san) {
@@ -940,8 +944,12 @@ bool Board::isCheck() const {
 	return getAttackers(BB::bitscan(boards[us][eKing]), us);
 }
 
-int16_t Board::evalUpdate() const {
+int Board::evalUpdate(Move move)  {
 	int out = 0;
+	if (true) {
+		return evalFullUpdate();
+	}
+
 	int16_t game_phase = 24 -
 		BB::popcnt(boards[eWhite][eKnight]) -
 		BB::popcnt(boards[eWhite][eBishop]) -
@@ -953,59 +961,32 @@ int16_t Board::evalUpdate() const {
 		BB::popcnt(boards[eBlack][eQueen]) * 4
 		;
 
-	int mg_val = 0;
-	int eg_val = 0;
-	u64 white_squares = boards[eWhite][0];
-	unsigned long at;
-	while (white_squares) {
-		BB::bitscan_reset(at, white_squares);
-		u8 p = piece_board[at];
-		u8 sq = at ^ 56;
-		mg_val += mg_table[p][sq];
-		eg_val += eg_table[p][sq];
+	u8 from = move.from();
+	u8 to = move.to();
+	if (us != eWhite) {
+		from ^= 56;
+		to ^= 56;
 	}
 
-	u64 black_squares = boards[eBlack][0];
-	at = 0;
-	while (black_squares) {
-		BB::bitscan_reset(at, black_squares);
-		u8 p = piece_board[at];
-		u8 sq = at;
-		mg_val -= mg_table[p][sq];
-		eg_val -= eg_table[p][sq];
-	}
-
-	out += (mg_val + (game_phase * eg_val - mg_val) / 24);
-
-	//count doubled pawns
+	int mg_val = mg_table[move.piece()][from];
+	int eg_val = eg_table[move.piece()][from];
+	int old_val = (mg_val + (game_phase * eg_val - mg_val) / 24);
 
 
-	//count isolated and doubled
-	for (int file = 0; file < 8; file++) {
-		if (boards[eWhite][ePawn] & BB::files[file])
-			out -= (boards[eWhite][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
-		if (boards[eBlack][ePawn] & BB::files[file])
-			out += (boards[eBlack][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
+	mg_val = mg_table[move.piece()][to];
+	eg_val = eg_table[move.piece()][to];
+	int new_val = (mg_val + (game_phase * eg_val - mg_val) / 24);
 
-		out -= 30 * (BB::popcnt(boards[eWhite][ePawn] & BB::files[file]) >= 2);
-		out += 30 * (BB::popcnt(boards[eBlack][ePawn] & BB::files[file]) >= 2);
-	}
+	int update = new_val - old_val;
 
-	//count defenders
-	u64 w_east_defenders = BB::get_pawn_attacks(eEast, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
-	u64 w_west_defenders = BB::get_pawn_attacks(eWest, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
-	u64 b_east_defenders = BB::get_pawn_attacks(eEast, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
-	u64 b_west_defenders = BB::get_pawn_attacks(eWest, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
+	out = eval + ((us == eWhite) ? -update : update);
 
-	//single defenders
-	out += 3 * (BB::popcnt(w_east_defenders | w_west_defenders) - BB::popcnt(b_east_defenders | b_west_defenders));
-	//out += 4 * (getMobility(eWhite) - getMobility(eBlack));
-	//double defenders
-	//out += var * (BB::popcnt(w_east_defenders & w_west_defenders) - BB::popcnt(b_east_defenders & b_west_defenders));
-	out = us == eWhite ? out : -out;
+
+	int t = evalFullUpdate();
 
 	return out;
 }
+
 
 void Board::runSanityChecks() const {
 	if (BB::popcnt(boards[eBlack][ePawn]) > 8 || BB::popcnt(boards[eWhite][ePawn]) > 8) {

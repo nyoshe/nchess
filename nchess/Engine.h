@@ -184,12 +184,9 @@ public:
 			out = moves[pos];
 			moves[pos] = moves.back();
 			moves.pop_back();
-
 			*pos_best = e.eval_vec[eval_ply].back();
 			e.eval_vec[eval_ply].pop_back();
 
-
-			
 			return out;
 		}
 		return Move();
