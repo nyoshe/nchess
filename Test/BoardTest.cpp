@@ -159,13 +159,15 @@ TEST(BoardTest, TestGames) {
     }
     
     auto allGames = pgn::read_pgn_file(file);
-    for (int var = 0; var < 10; var+=1) {
+    for (int var = 0; var < 20; var+=1) {
+        board.tunable = var;
         double sum_squared_diff = 0.0;
         int move_count = 0;
         for (int i = 0; i < 1000; i++) {
 
             for (auto gameMove : allGames[i]) {
                 Move move = board.moveFromSan(gameMove.san);
+                if (!move.raw()) continue;
 
                 Board test_board = board;
                 board.doMove(move);
@@ -175,7 +177,7 @@ TEST(BoardTest, TestGames) {
 
                 board.doMove(move);
 
-                double diff = static_cast<double>(board.us ? -board.evalUpdate() : board.evalUpdate()) - static_cast<double>(gameMove.eval);
+                double diff = static_cast<double>(board.us ? -board.getEval() : board.getEval()) - static_cast<double>(gameMove.eval);
 
                 //excludes checks from static eval
                 if (std::abs(diff) <= 50000) {
@@ -196,8 +198,8 @@ TEST(BoardTest, TestGames) {
         if (move_count > 0) {
             double mean_square_diff = sum_squared_diff / move_count;
             // 240.605
-            std::cout << "var: " << var << std::endl;
-            std::cout << "Mean square difference: " << mean_square_diff << std::endl;
+            std::cout << "var: " << var;
+            std::cout << "   Mean square difference: " << mean_square_diff << std::endl;
         }
         else {
             std::cout << "No moves to compare." << std::endl;

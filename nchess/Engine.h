@@ -74,6 +74,7 @@ private:
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
 	int quiesce(int alpha, int beta, bool is_pv);
 public:
+
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	int hash_hits = 0;
 	std::array<StaticVector<int>, 64> eval_vec;

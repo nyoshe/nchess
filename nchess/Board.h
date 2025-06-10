@@ -1,4 +1,5 @@
 #pragma once
+#define NOMINMAX
 #include "Misc.h"
 #include "BitBoard.h"
 #include "Move.h"
@@ -7,7 +8,6 @@
 #include <iomanip>
 #include <io.h>
 #include <fcntl.h>
-#define NOMINMAX
 #include <Windows.h>
 #include <stdio.h>
 #include <vector>
@@ -15,9 +15,11 @@
 #include <cassert>
 #include <sstream>
 #include <ranges>
-
+#include <limits>
 #include "Memory.h"
 #include "robin_hood.h"
+#undef min
+#undef max
 
 inline u64 rnd64()
 {
@@ -74,6 +76,7 @@ private:
     u8 castle_flags = 0b1111;
     int ep_square = -1; // -1 means no en passant square, ep square represents piece taken
 public:
+    int tunable = 0;
     std::vector<BoardState> state_stack;
     bool us = eWhite;
     int ply = 0;
@@ -187,32 +190,43 @@ public:
         }
 
         out += (mg_val + (game_phase * eg_val - mg_val) / 24);
-        /*
+        
         //count doubled pawns
         //count isolated and doubled
         for (int file = 0; file < 8; file++) {
+            /*
             if (boards[eWhite][ePawn] & BB::files[file])
                 out -= (boards[eWhite][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
             if (boards[eBlack][ePawn] & BB::files[file])
                 out += (boards[eBlack][ePawn] & BB::neighbor_files[file]) ? 0 : 10;
-
+			*/
             out -= 30 * (BB::popcnt(boards[eWhite][ePawn] & BB::files[file]) >= 2);
             out += 30 * (BB::popcnt(boards[eBlack][ePawn] & BB::files[file]) >= 2);
         }
-
+        
         //count defenders
         u64 w_east_defenders = BB::get_pawn_attacks(eEast, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
         u64 w_west_defenders = BB::get_pawn_attacks(eWest, eWhite, boards[eWhite][ePawn], boards[eWhite][ePawn]);
         u64 b_east_defenders = BB::get_pawn_attacks(eEast, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
         u64 b_west_defenders = BB::get_pawn_attacks(eWest, eBlack, boards[eBlack][ePawn], boards[eBlack][ePawn]);
-
+        
         //single defenders
-        out += 3 * (BB::popcnt(w_east_defenders | w_west_defenders) - BB::popcnt(b_east_defenders | b_west_defenders));
-        //out += 4 * (getMobility(eWhite) - getMobility(eBlack));
+        out += 4 * (BB::popcnt(w_east_defenders | w_west_defenders) - BB::popcnt(b_east_defenders | b_west_defenders));
+        /*
+        //get attacks, ignoring our pieces
+        u64 w_king_pseudo_attacks = BB::get_queen_attacks(BB::bitscan(boards[eWhite][eKing]), boards[eBlack][0]);
+        u64 b_king_pseudo_attacks = BB::get_queen_attacks(BB::bitscan(boards[eBlack][eKing]), boards[eWhite][0]);
+        int w_king_attackers = std::min(BB::popcnt(w_king_pseudo_attacks & boards[eBlack][0]), 5);
+        int b_king_attackers = std::min(BB::popcnt(b_king_pseudo_attacks & boards[eWhite][0]), 5);
+    	int attack_table[] = { 5, 8, 0, 0, 0, 0};
+        out += attack_table[w_king_attackers] - attack_table[b_king_attackers];
+        out += 4;
+		*/
+    	//out += 4 * (getMobility(eWhite) - getMobility(eBlack));
         //double defenders
         //out += var * (BB::popcnt(w_east_defenders & w_west_defenders) - BB::popcnt(b_east_defenders & b_west_defenders));
-        out = us == eWhite ? out : -out;
-		*/
+        //out = us == eWhite ? out : -out;
+		
         return out;
     }
 };

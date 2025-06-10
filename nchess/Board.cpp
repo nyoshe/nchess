@@ -604,6 +604,7 @@ Move Board::moveFromSan(const std::string& san) {
 		if (disambig_rank && ((m.from() >> 3) != (disambig_rank - '1'))) continue;
 		return m;
 	}
+	return Move();
 	printBitBoards();
 	std::cout << boardString() << "\n";
 	std::cout << ep_square;
@@ -1087,8 +1088,8 @@ u64 Board::getHash() const {
 bool Board::is3fold() {
 	if (state_stack.size() < half_move || state_stack.empty()) return false;
 	int counter = 0;
-	for (int i = 0; i < half_move; i++) {
-		if (state_stack[state_stack.size() - i - 1].hash == hash) {
+	for (int i = 2; i < half_move; i++) {
+		if (state_stack[state_stack.size() - i].hash == hash) {
 			counter++;
 		}
 	}
@@ -1112,6 +1113,7 @@ u64 Board::calcHash() const {
 }
 
 void Board::updateZobrist(Move move) {
+	
 	u8 p = move.piece();
 	hash ^= z.side;
 	hash ^= z.piece_at[(move.from() * 12) + (move.piece() - 1) + (!us * 6)]; //invert from square hash
@@ -1165,6 +1167,8 @@ void Board::updateZobrist(Move move) {
 			}
 		}
 	}
+
+
 }
 
 int Board::getMobility(bool side) const {

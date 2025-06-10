@@ -380,8 +380,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			best = score;
 			best_move = move;
 		}
-		
-			
+
 		if (score > alpha) {
 			alpha = score;
 			if (is_pv) {
@@ -390,9 +389,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 				b.undoMove();
 			}
 			raised_alpha = true;
-			
 		}
-
 
 		if (score >= beta) {
 			if (!move.captured()) {
@@ -410,8 +407,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 						malus - history_table[b.us][quiet.from()][quiet.to()] * abs(malus) / 16383;
 				}
 			}
-			
-			
+
 			storeTTEntry(b.getHash(), beta, TType::BETA_CUT, depth_left, best_move);
 			return beta;
 		}
@@ -422,7 +418,6 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	if (raised_alpha) {
 		storeTTEntry(b.getHash(), best, TType::EXACT, depth_left, best_move);
 	} else {
-		// fail-low node - none of the moves improved alpha
 		storeTTEntry(b.getHash(), best, TType::FAIL_LOW, depth_left, best_move);
 	}
 	return best;
@@ -438,11 +433,7 @@ std::vector<Move> Engine::getPrincipalVariation() const {
 }
 
 void Engine::printPV(int score) {
-	if (score == 99950) {
-		std::cout << "huh";
-	}
 	std::vector<Move> pv = getPrincipalVariation();
-	//if (!pv.empty()) {
 	std::cout << "info score cp " << score << " depth " << max_depth
 		<< " nodes " << nodes
 		<< " nps " << static_cast<int>((1000.0 * nodes) / (1000.0 * (std::clock() - start_time) / CLOCKS_PER_SEC))
@@ -452,8 +443,6 @@ void Engine::printPV(int score) {
 		std::cout << move.toUci() << " ";
 	}
 	std::cout << std::endl;
-	//}
-
 }
 
 std::string Engine::getPV() {
@@ -472,12 +461,9 @@ std::string Engine::getPV() {
 		return out;
 	}
 	return "";
-	//}
 }
 
 void Engine::storeTTEntry(u64 hash_key, int score, TType type, u8 depth_left, Move best) {
-	//u64 index = hash_key & (1048576 - 1);
-	
 	u64 index = __mulh(hash_key & 0x7FFFFFFFFFFFFFFF, hash_size);
 	if (tt[index].ply <= start_ply || tt[index].depth_left <= depth_left) { //replace
 		tt[index] = TTEntry{ hash_key, score, u8(depth_left), u16(start_ply), u8(max_depth), type, best };
@@ -578,13 +564,10 @@ int Engine::quiesce(int alpha, int beta, bool is_pv) {
 		int score = -quiesce(-beta, -alpha, is_pv);
 		b.undoMove();
 
-		
-
 		if (score > best) {
 			best_move = move;
 			best = score;
 		}
-
 		if (score > alpha) {
 			alpha = score;
 			raised_alpha = true;
@@ -598,9 +581,7 @@ int Engine::quiesce(int alpha, int beta, bool is_pv) {
 	}
 	if (raised_alpha) {
 		storeTTEntry(b.getHash(), best, TType::EXACT, 0, best_move);
-	}
-	else {
-		// fail-low node - none of the moves improved alpha
+	} else {
 		storeTTEntry(b.getHash(), best, TType::FAIL_LOW, 0, best_move);
 	}
 	return best;
