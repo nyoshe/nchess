@@ -556,6 +556,7 @@ int Engine::quiesce(int alpha, int beta) {
 		} else if (move_vec[search_ply].empty()) {
 			return 0;
 		}
+		return stand_pat;
 	}
 	Move best_move;
 	MoveGen move_gen;
