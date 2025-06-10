@@ -52,7 +52,7 @@ Move Engine::search(int depth) {
 	for (int i = 0; i < MAX_PLY; i++) {
 		pv_length[i] = 0;
 	}
-	pv_moves.clear();
+
 	nodes = 0;
 	start_time = std::clock();
 	start_ply = b.ply;
@@ -68,15 +68,19 @@ Move Engine::search(int depth) {
 	}
 
 	max_depth = 1;
-	int score = 0;//alphaBeta(-100000, 100000, max_depth, true);
+	int score = 0;
+	int last_score = -100000;
 
 
 	for (max_depth = 1; max_depth < 20; max_depth++) {
 
-		// Start with narrow aspiration window
-		int alpha = score - 50;
-		int beta = score + 50;
+
+		// Keep searching until we get a score within our window
+		pv_length[0] = 0;
 		int delta = 50;
+		int alpha = last_score - delta;
+		int beta = last_score + delta;
+		
 
 		// Keep searching until we get a score within our window
 		while (true) {
@@ -93,8 +97,8 @@ Move Engine::search(int depth) {
 			}
 			if (alpha <= -100000 && beta >= 100000) break;
 		}
-
-		pv_length[0] = 0;
+		
+		
 		int index = 0;
 
 		for (auto& move : sorted_moves) {
@@ -129,8 +133,9 @@ Move Engine::search(int depth) {
 			}
 			index++;
 		}
-
+		
 		std::sort(sorted_moves.begin(), sorted_moves.end(), [](const auto& a, const auto& b) { return a.first > b.first;  });
+		last_score = sorted_moves[0].first;
 		if (checkTime()) break;
 		printPV(alpha);
 
@@ -271,20 +276,20 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	if (b.is3fold() || b.half_move == 100) return 0;
 	bool in_check = b.isCheck();
 	if (depth_left == 0 && in_check) { depth_left++; }
-	if (depth_left <= 0) return quiesce(alpha, beta);
+	if (depth_left <= 0) return quiesce(alpha, beta, is_pv);
 
 	u64 hash_key = b.getHash();
 	TTEntry entry = probeTT(hash_key);
 
-	if (entry && entry.depth_from_root >= max_depth && entry.depth_left >= depth_left && entry.hash == b.getHash()) {
+	if (!is_pv && entry && entry.depth_from_root >= max_depth && entry.depth_left >= depth_left && entry.hash == b.getHash()) {
 		if (entry.type == TType::EXACT) return entry.eval;
-		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
-		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
+		if (entry.type == TType::BETA_CUT && entry.eval >= beta) return entry.eval;
+		if (entry.type == TType::FAIL_LOW && entry.eval <= alpha) return entry.eval;
 	}
 
 	int best = -100000;
 	Move best_move;
-	bool can_apply_futility = !in_check && depth_left <= 3 && !is_pv;
+	
 
 
 	if (search_ply >= MAX_PLY - 1) return b.getEval();
@@ -299,12 +304,11 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	}
 
 	// Futility margins increasing by depth
-	const int futility_margins[4] = { 0, 100, 300, 500 };
+	const static int futility_margins[4] = { 0, 100, 300, 500 };
 	bool futility_prune = false;
-	int futility_margin = 0;
 
-	if (can_apply_futility) {
-		futility_margin = b.getEval() + futility_margins[depth_left];
+	if (!in_check && depth_left <= 3 && !is_pv) {
+		int futility_margin = b.getEval() + futility_margins[depth_left];
 		futility_prune = (futility_margin <= alpha);
 	}
 
@@ -321,18 +325,18 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 
 
 	if (checkTime()) return -100000;
-
-	int i = 0;
+	TType tt_flag = TType::FAIL_LOW;
+	int moves_searched = 0;
 	search_calls++;
 	MoveGen move_gen;
-
+	bool raised_alpha = false;
 	seen_quiets[search_ply].clear();
 	while (const Move move = move_gen.getNext(*this, b, move_vec[search_ply])) {
 		moves_inspected++;
 
 		int score = 0;
 		bool can_reduce =
-			i >= 3 &&
+			moves_searched >= 3 &&
 			!move.captured() &&
 			!move.promotion() &&
 			!in_check &&
@@ -346,19 +350,20 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			!move.captured() &&
 			!move.promotion() &&
 			!move.isEnPassant() &&
+			!is_pv &&
 			!in_check) {
 			b.undoMove();
 
-			i++;
+			moves_searched++;
 			continue;
 		}
 
 		if (can_reduce) {
-			int R = int(0.5 + std::log(depth_left) * std::log(i) / 3.0);
+			int R = int(0.5 + std::log(depth_left) * std::log(moves_searched) / 3.0);
 			score = -alphaBeta(-alpha - 1, -alpha, depth_left - 1 - R, false);
 		}
 
-		else if (i == 0) {
+		else if (moves_searched == 0) {
 			score = -alphaBeta(-beta, -alpha, depth_left - 1, is_pv);
 		}
 		else {
@@ -370,21 +375,24 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 		
 		b.undoMove();
 
-		i++;
-
+		moves_searched++;
 		if (score > best) {
 			best = score;
 			best_move = move;
-			if (score > alpha) {
-				alpha = score;
-				if (is_pv) {
-					b.doMove(best_move);
-					if (!b.is3fold()) updatePV(b.ply - start_ply - 1, best_move);
-					b.undoMove();
-					storeTTEntry(b.getHash(), best, TType::EXACT, depth_left, best_move);
-				}
-			}
 		}
+		
+			
+		if (score > alpha) {
+			alpha = score;
+			if (is_pv) {
+				b.doMove(best_move);
+				if (!b.is3fold()) updatePV(b.ply - start_ply - 1, best_move);
+				b.undoMove();
+			}
+			raised_alpha = true;
+			
+		}
+
 
 		if (score >= beta) {
 			if (!move.captured()) {
@@ -392,7 +400,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 				killer_moves[search_ply][1] = killer_moves[search_ply][0];
 				killer_moves[search_ply][0] = move;
 				int bonus = std::min(7 * depth_left * depth_left + 274 * depth_left - 182, 2048);
-				int malus = std::min(-(5 * depth_left * depth_left + 283 * depth_left + 169), 1024);
+				int malus = -std::min(5 * depth_left * depth_left + 283 * depth_left + 169, 1024);
 				bonus = std::clamp((int)bonus, int(-16383), int(16383));
 				malus = std::clamp((int)malus, int(-16383), int(16383));
 				history_table[b.us][move.from()][move.to()] +=
@@ -404,19 +412,19 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 			}
 			
 			
-			storeTTEntry(b.getHash(), beta, TType::BETA, depth_left, best_move);
+			storeTTEntry(b.getHash(), beta, TType::BETA_CUT, depth_left, best_move);
 			return beta;
 		}
 		if (!move.captured()) {
 			seen_quiets[search_ply].emplace_back(move);
 		}
 	}
-	if (best <= alpha) {
+	if (raised_alpha) {
+		storeTTEntry(b.getHash(), best, TType::EXACT, depth_left, best_move);
+	} else {
 		// fail-low node - none of the moves improved alpha
-		storeTTEntry(b.getHash(), alpha, TType::ALPHA, depth_left, best_move);
-		return alpha;
+		storeTTEntry(b.getHash(), best, TType::FAIL_LOW, depth_left, best_move);
 	}
-	// exact score node
 	return best;
 }
 
@@ -514,7 +522,7 @@ void Engine::updatePV(int depth, Move move) {
 	pv_length[depth] = pv_length[depth + 1] + 1;
 }
 
-int Engine::quiesce(int alpha, int beta) {
+int Engine::quiesce(int alpha, int beta, bool is_pv) {
 	nodes++;
 	int search_ply = b.ply - start_ply;
 
@@ -535,10 +543,10 @@ int Engine::quiesce(int alpha, int beta) {
 	u64 hash_key = b.getHash();
 	TTEntry entry = probeTT(hash_key);
 
-	if (entry && entry.depth_from_root >= max_depth && entry.hash == b.getHash()) {
+	if (!is_pv && entry && entry.depth_from_root >= max_depth && entry.hash == b.getHash()) {
 		if (entry.type == TType::EXACT) return entry.eval;
-		if (entry.type == TType::BETA && entry.eval >= beta) return entry.eval;
-		if (entry.type == TType::ALPHA && entry.eval <= alpha) return entry.eval;
+		if (entry.type == TType::BETA_CUT && entry.eval >= beta) return entry.eval;
+		if (entry.type == TType::FAIL_LOW && entry.eval <= alpha) return entry.eval;
 	}
 
 
@@ -558,6 +566,7 @@ int Engine::quiesce(int alpha, int beta) {
 		}
 		return stand_pat;
 	}
+	bool raised_alpha = false;
 	Move best_move;
 	MoveGen move_gen;
 	Move move = move_gen.getNext(*this, b, move_vec[search_ply]);
@@ -566,14 +575,10 @@ int Engine::quiesce(int alpha, int beta) {
 
 
 		b.doMove(move);
-		int score = -quiesce(-beta, -alpha);
+		int score = -quiesce(-beta, -alpha, is_pv);
 		b.undoMove();
 
-		if (score >= beta) {
-			best_move = move;
-			storeTTEntry(b.getHash(), beta, TType::BETA, 0, best_move);
-			return score;
-		}
+		
 
 		if (score > best) {
 			best_move = move;
@@ -582,11 +587,22 @@ int Engine::quiesce(int alpha, int beta) {
 
 		if (score > alpha) {
 			alpha = score;
-			storeTTEntry(b.getHash(), alpha, TType::ALPHA, 0, best_move);
+			raised_alpha = true;
+		}
+		if (score >= beta) {
+			best_move = move;
+			storeTTEntry(b.getHash(), beta, TType::BETA_CUT, 0, best_move);
+			return beta;
 		}
 		move = move_gen.getNext(*this, b, move_vec[search_ply]);
 	}
-	if (best <= alpha) return alpha;
+	if (raised_alpha) {
+		storeTTEntry(b.getHash(), best, TType::EXACT, 0, best_move);
+	}
+	else {
+		// fail-low node - none of the moves improved alpha
+		storeTTEntry(b.getHash(), best, TType::FAIL_LOW, 0, best_move);
+	}
 	return best;
 }
 

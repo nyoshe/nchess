@@ -10,8 +10,8 @@
 enum class TType : u8 {
 	INVALID,
 	EXACT,
-	ALPHA,
-	BETA,
+	FAIL_LOW,
+	BETA_CUT,
 	BEST
 };
 
@@ -50,7 +50,6 @@ private:
 
 	std::array<int, MAX_PLY> pv_length;
 	std::array<std::array<Move, 10>, MAX_PLY> killer_moves;
-	std::vector<Move> pv_moves;
 	std::vector<TTEntry> tt;
 
 
@@ -59,6 +58,7 @@ private:
 	u16 max_depth = 0;
 	int nodes = 0;
 	int current_age = 0;
+	Move root_best;
 
 	float search_calls = 0;
 	float moves_inspected = 0;
@@ -72,7 +72,7 @@ private:
 
 	void perftSearch(int depth);
 	int alphaBeta(int alpha, int beta, int depth_left, bool is_pv);
-	int quiesce(int alpha, int beta);
+	int quiesce(int alpha, int beta, bool is_pv);
 public:
 	std::array<std::array<std::array<int, 64>, 64>, 2> history_table;
 	int hash_hits = 0;
@@ -189,33 +189,6 @@ public:
 			moves.pop_back();
 			return out;
 		}
-
-		/*
-		if (stage == MoveStage::evals && !init) {
-			init = true;
-			int eval_ply = b.ply - e.start_ply;
-			e.eval_vec[eval_ply].clear();
-			for (auto& move : moves) {
-				b.doMove(move);
-				e.eval_vec[eval_ply].emplace_back(-b.getEval());
-				b.undoMove();
-			}
-		}
-		assert(init == (stage == MoveStage::evals));
-		if (stage == MoveStage::evals && !moves.empty() && init) {
-			int eval_ply = b.ply - e.start_ply;
-			auto pos_best = std::ranges::max_element(e.eval_vec[eval_ply].begin(), e.eval_vec[eval_ply].end());
-
-			int pos = std::distance(e.eval_vec[eval_ply].begin(), pos_best);
-			out = moves[pos];
-			moves[pos] = moves.back();
-			moves.pop_back();
-			*pos_best = e.eval_vec[eval_ply].back();
-			e.eval_vec[eval_ply].pop_back();
-
-			return out;
-		}
-		*/
 		return Move();
 	}
 };

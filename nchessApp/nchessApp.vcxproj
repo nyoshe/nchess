@@ -24,6 +24,7 @@
     <ProjectGuid>{31fd48c0-6f6f-4ff6-b161-6432db42ee6c}</ProjectGuid>
     <RootNamespace>nchessApp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>artisanApp</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

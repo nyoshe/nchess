@@ -863,17 +863,12 @@ void Board::filterToLegal(StaticVector<Move>& moves) {
 				continue;
 			}
 		}
-		if (is3fold()) {
+		if (is3fold() || half_move == 100) {
 			//moves.erase(moves.begin() + i);
 			continue;
 		}
 
 		doMove(move);
-		if (half_move > 100) {
-			//moves.erase(moves.begin() + i);
-			undoMove();
-			continue;
-		}
 		us ^= 1;
 		bool inCheck = isCheck();
 		us ^= 1;
