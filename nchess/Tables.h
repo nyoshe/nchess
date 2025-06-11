@@ -1,8 +1,8 @@
 #pragma once
 
 // MG values
-static int mg_p_val[7] = { 0, 82, 337, 365, 477, 1025, 10000};
-static int eg_p_val[7] = { 0, 94, 281, 297, 512,  936, 10000 };
+static int mg_p_val[7] = { 0, 104, 420, 427, 569, 1485, 10000};
+static int eg_p_val[7] = { 0, 204, 632, 659, 1111,  1963, 10000 };
 
 /* piece/sq tables */
 /* values from Rofchade: http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19 */

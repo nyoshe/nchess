@@ -91,6 +91,14 @@ Info; info score cp 716 depth 8 nodes 594293 nps 3301627 pv e6c7 e8d8 c4b3 h8g8 
 Position; fen r1bqkb1r/pppp1ppp/2n2n2/4P3/4P3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 4
 Moves; f6e4 d1d5 f7f5 f1c4 d8e7 e1g1 c6b4 d5d1 b4c6 b1c3 c6e5 c3d5 e5f3 d1f3 e7c5 f3f5 e4f6 d5f6 e8d8 f1e1 f8e7 f5c5 e7c5 f6d5 h7h6 c1f4 d7d6 b2b4 c5b6 e1e7 g7g5 f4d2 b6d4 a1e1 c7c6 d5c7 a8b8 c2c3 d4e5 e7f7 b7b5 c7e6 d8e8 e6c7 e8d8 c7e6 d8e8
                 */
+                static std::vector<std::string> pos_list = {
+                    "fen r1bqk1r1/1p1p1n2/p1n2pN1/2p1b2Q/2P1Pp2/1PN5/PB4PP/R4RK1 w q -",
+					"fen r1n2N1k/2n2K1p/3pp3/5Pp1/b5R1/8/1PPP4/8 w -",
+					"fen r1b1r1k1/1pqn1pbp/p2pp1p1/P7/1n1NPP1Q/2NBBR2/1PP3PP/R6K w -",
+					"fen 5b2/p2k1p2/P3pP1p/n2pP1p1/1p1P2P1/1P1KBN2/7P/8 w -",
+					"fen r3kbnr/1b3ppp/pqn5/1pp1P3/3p4/1BN2N2/PP2QPPP/R1BR2K1 w kq -"
+
+                };
 
                 std::istringstream test("fen r1bqkb1r/pppp1ppp/2n2n2/4P3/4P3/5N2/PPP2PPP/RNBQKB1R b KQkq - 0 4 moves f6e4 d1d5 f7f5 f1c4 d8e7 e1g1 c6b4 d5d1 b4c6 b1c3 c6e5 c3d5 e5f3 d1f3 e7c5 f3f5 e4f6 d5f6 e8d8 f1e1 f8e7 f5c5 e7c5 f6d5 h7h6 c1f4 d7d6 b2b4 c5b6 e1e7 g7g5 f4d2 b6d4 a1e1 c7c6 d5c7 a8b8 c2c3 d4e5");
 
@@ -101,8 +109,22 @@ Moves; f6e4 d1d5 f7f5 f1c4 d8e7 e1g1 c6b4 d5d1 b4c6 b1c3 c6e5 c3d5 e5f3 d1f3 e7c
                 setupBoard(test);
                 engine_.b.printBoard();
                 std::cout << engine_.b.boardString();
-                std::istringstream go_stream("go movetime 500000");
+                std::istringstream go_stream("go movetime 500");
                 handleGo(go_stream);
+
+                while (true) {
+                    for (auto& position : pos_list) {
+                        engine_ = Engine();
+                        std::istringstream ss(position);
+                        setupBoard(ss);
+                        std::istringstream go_ss("go movetime 1000");
+                        handleGo(go_ss);
+                    }
+                }
+                
+                
+
+                
             }
             // Add more UCI commands as needed
         }

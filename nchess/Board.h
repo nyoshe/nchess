@@ -22,8 +22,10 @@
 #undef max
 
 static int32_t constexpr S(const int mg, const int eg) { return static_cast<int32_t>(static_cast<uint32_t>(eg) << 16) + (mg); };
-#define MG_SCORE(s) ((int16_t)((uint16_t)((unsigned)((s)))))
-#define EG_SCORE(s) ((int16_t)((uint16_t)((unsigned)((s) + 0x8000) >> 16)))
+static int32_t constexpr MG_SCORE(const int s) {
+    return ((int16_t)((uint16_t)((unsigned)((s)))));
+}
+static int32_t constexpr EG_SCORE(const int s) { return ((int16_t)((uint16_t)((unsigned)((s)+0x8000) >> 16))); }
 
 inline u64 rnd64()
 {
@@ -162,7 +164,7 @@ public:
         int out = 0;
 
         //tempo
-        out += 18;
+        out += 30;
 
         int16_t game_phase = 24 -
             BB::popcnt(boards[eWhite][eKnight]) -
@@ -225,13 +227,13 @@ public:
         int white_king_sq = BB::bitscan(boards[eWhite][eKing]);
         int black_king_sq = BB::bitscan(boards[eBlack][eKing]);
 
-        /*
+        
         auto king_safety = [&](int sq, bool side) {
             u64 king_acc = BB::king_attacks[sq];
-            king_acc = ~boards[side][0] & king_acc << (side ? -8 : 8);
-            king_acc = ~boards[side][0] & king_acc << (side ? -8 : 8);
-            king_acc = ~boards[side][0] & king_acc << (side ? -8 : 8);
-            return king_acc;
+            king_acc = (~boards[side][0] & (king_acc | BB::set_bit(sq))) << (side ? -8 : 8);
+            king_acc = (~boards[side][0] & (king_acc | BB::set_bit(sq))) << (side ? -8 : 8);
+            king_acc = (~boards[side][0] & (king_acc | BB::set_bit(sq))) << (side ? -8 : 8);
+            return (king_acc | BB::king_attacks[sq]) & ~BB::set_bit(sq);
             };
         static const int SafetyTable[100] = {
     0,  0,   1,   2,   3,   5,   7,   9,  12,  15,
@@ -257,39 +259,41 @@ public:
             unsigned long at = 0;
             int attack_val = 0;
             int num_attackers = 0;
-            static int attack_weight[] = { 0, 50, 75, 88, 94, 97, 99 };
+            static const int CountModifier[8] = { 0, 0, 63, 126, 96, 124, 124, 128 };
             while (knights) {
                 BB::bitscan_reset(at, knights);
-                attack_val += 2 * BB::popcnt(BB::knight_attacks[at] & ~boards[side][0] & king_zone);
+                attack_val += 36 * BB::popcnt(BB::knight_attacks[at] & ~boards[side][0] & king_zone);
                 num_attackers++;
             }
             at = 0;
             while (bishops) {
                 BB::bitscan_reset(at, bishops);
-                attack_val += 2 * BB::popcnt(BB::get_bishop_attacks(at, occ) & ~boards[side][0] & king_zone);
+                attack_val += 22 * BB::popcnt(BB::get_bishop_attacks(at, occ) & ~boards[side][0] & king_zone);
                 num_attackers++;
             }
             at = 0;
             while (rooks) {
                 BB::bitscan_reset(at, rooks);
-                attack_val += 3 * BB::popcnt(BB::get_rook_attacks(at, occ) & ~boards[side][0] & king_zone);
+                attack_val += 23 * BB::popcnt(BB::get_rook_attacks(at, occ) & ~boards[side][0] & king_zone);
                 num_attackers++;
             }
             at = 0;
             while (queens) {
                 BB::bitscan_reset(at, queens);
-                attack_val += 5 * BB::popcnt(BB::get_queen_attacks(at, occ) & ~boards[side][0] & king_zone);
+                attack_val += 78 * BB::popcnt(BB::get_queen_attacks(at, occ) & ~boards[side][0] & king_zone);
                 num_attackers++;
             }
-            return SafetyTable[attack_val];
+
+            int danger = (CountModifier[std::min(num_attackers, 7)] * attack_val) / 128;
+            return danger;
             };
-
-        //get attacks, ignoring our pieces
-        out -= S(1, 1) * king_attack_val(eWhite);
-        out += S(1, 1) * king_attack_val(eBlack);
-
-        */
         
+        //get attacks, ignoring our pieces
+        out -= S(king_attack_val(eWhite), 0);
+        out += S(king_attack_val(eBlack), 0);
+
+        
+        /*
         static u64 pawn_shield_white_king =
             BB::set_bit(f2) | BB::set_bit(g2) | BB::set_bit(h2) |
             BB::set_bit(f3) | BB::set_bit(g3) | BB::set_bit(h3);
@@ -309,7 +313,7 @@ public:
         out += S(31, -12) * (white_king_sq == b1 && (BB::popcnt(pawn_shield_white_queen & boards[eWhite][ePawn]) >= 3));
         out -= S(31, -12) * (black_king_sq == b8 && (BB::popcnt(pawn_shield_black_queen & boards[eBlack][ePawn]) >= 3));
 
-
+		*/
         /*
         auto mobility = [&](bool side) {
             int mob = 0;
@@ -342,7 +346,7 @@ public:
         //double defenders
         //out += var * (BB::popcnt(w_east_defenders & w_west_defenders) - BB::popcnt(b_east_defenders & b_west_defenders));
         //out = us == eWhite ? out : -out;
-        out = (MG_SCORE(out) + (game_phase * EG_SCORE(out) - MG_SCORE(out)) / 24);
+        out = ((24 - game_phase) * ((MG_SCORE(out) * 88)/128) / 24)  + (game_phase * ((EG_SCORE(out) * 170) / 128)) / 24;
         return out;
     }
 };

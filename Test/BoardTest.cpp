@@ -159,7 +159,7 @@ TEST(BoardTest, TestGames) {
     }
     
     auto allGames = pgn::read_pgn_file(file);
-    for (int var = -1; var < 1; var+=1) {
+    for (int var = 50; var < 200; var+=2) {
         board.tunable = var;
         double sum_squared_diff = 0.0;
         int move_count = 0;
@@ -177,7 +177,8 @@ TEST(BoardTest, TestGames) {
 
                 board.doMove(move);
 
-                double diff = static_cast<double>(board.us ? -board.getEval() : board.getEval()) - static_cast<double>(gameMove.eval);
+                double board_eval = static_cast<double>(board.us ? -board.getEval() : board.getEval());
+                double diff = board_eval - static_cast<double>(gameMove.eval);
 
                 //excludes checks from static eval
                 if (std::abs(diff) <= 50000) {
