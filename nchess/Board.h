@@ -225,6 +225,7 @@ public:
         int white_king_sq = BB::bitscan(boards[eWhite][eKing]);
         int black_king_sq = BB::bitscan(boards[eBlack][eKing]);
 
+        /*
         auto king_safety = [&](int sq, bool side) {
             u64 king_acc = BB::king_attacks[sq];
             king_acc = ~boards[side][0] & king_acc << (side ? -8 : 8);
@@ -287,7 +288,7 @@ public:
         out -= S(1, 1) * king_attack_val(eWhite);
         out += S(1, 1) * king_attack_val(eBlack);
 
-        
+        */
         
         static u64 pawn_shield_white_king =
             BB::set_bit(f2) | BB::set_bit(g2) | BB::set_bit(h2) |
