@@ -159,11 +159,11 @@ TEST(BoardTest, TestGames) {
     }
     
     auto allGames = pgn::read_pgn_file(file);
-    for (int var = 0; var < 20; var+=1) {
+    for (int var = -1; var < 1; var+=1) {
         board.tunable = var;
         double sum_squared_diff = 0.0;
         int move_count = 0;
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 2000; i++) {
 
             for (auto gameMove : allGames[i]) {
                 Move move = board.moveFromSan(gameMove.san);
@@ -182,7 +182,7 @@ TEST(BoardTest, TestGames) {
                 //excludes checks from static eval
                 if (std::abs(diff) <= 50000) {
 
-                    sum_squared_diff += std::sqrt(diff * diff);
+                    sum_squared_diff += diff * diff;
                     move_count++;
                 }
 
@@ -196,7 +196,7 @@ TEST(BoardTest, TestGames) {
             EXPECT_EQ(board.getOccupancy(), 0xFFFF00000000FFFF);
         }
         if (move_count > 0) {
-            double mean_square_diff = sum_squared_diff / move_count;
+            double mean_square_diff = std::sqrt(sum_squared_diff) / move_count;
             // 240.605
             std::cout << "var: " << var;
             std::cout << "   Mean square difference: " << mean_square_diff << std::endl;

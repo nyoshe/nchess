@@ -79,6 +79,7 @@ namespace BB {
 
     inline u64 knight_attacks[64];
 	inline u64 king_attacks[64];
+
     
     inline u64 files[8];
     inline u64 ranks[8];
@@ -302,8 +303,10 @@ namespace BB {
                 Pos p(origin.f + move[0], origin.r + move[1]);
                 if (p.f >= 0 && p.f < 8 && p.r >= 0 && p.r < 8) {
                     king_attacks[i] |= set_bit(p.toSquare());
+
                 }
             }
+
         }
 
         //init file masks

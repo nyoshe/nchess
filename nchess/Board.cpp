@@ -1088,7 +1088,7 @@ u64 Board::getHash() const {
 bool Board::is3fold() {
 	if (state_stack.size() < half_move || state_stack.empty()) return false;
 	int counter = 0;
-	for (int i = 2; i < half_move; i++) {
+	for (int i = 1; i <= half_move; i++) {
 		if (state_stack[state_stack.size() - i].hash == hash) {
 			counter++;
 		}
@@ -1167,8 +1167,6 @@ void Board::updateZobrist(Move move) {
 			}
 		}
 	}
-
-
 }
 
 int Board::getMobility(bool side) const {

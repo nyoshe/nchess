@@ -324,7 +324,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	}
 
 
-	if (checkTime()) return -100000;
+	
 	TType tt_flag = TType::FAIL_LOW;
 	int moves_searched = 0;
 	search_calls++;
@@ -333,7 +333,7 @@ int Engine::alphaBeta(int alpha, int beta, int depth_left, bool is_pv) {
 	seen_quiets[search_ply].clear();
 	while (const Move move = move_gen.getNext(*this, b, move_vec[search_ply])) {
 		moves_inspected++;
-
+		if (checkTime()) return best;
 		int score = 0;
 		bool can_reduce =
 			moves_searched >= 3 &&
@@ -539,7 +539,6 @@ int Engine::quiesce(int alpha, int beta, bool is_pv) {
 	move_vec[search_ply].clear();
 	b.genPseudoLegalCaptures(move_vec[search_ply]);
 	b.filterToLegal(move_vec[search_ply]);
-	if (checkTime()) return -100000;
 
 	// Check for #M
 	if (!move_vec[search_ply].size()) {
@@ -558,7 +557,7 @@ int Engine::quiesce(int alpha, int beta, bool is_pv) {
 	Move move = move_gen.getNext(*this, b, move_vec[search_ply]);
 	while (move.raw()) {
 		if (move.captured() == eKing) return 99999 - (b.ply - start_ply);
-
+		if (checkTime()) return best;
 
 		b.doMove(move);
 		int score = -quiesce(-beta, -alpha, is_pv);
